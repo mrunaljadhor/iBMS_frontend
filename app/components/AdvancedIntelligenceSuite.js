@@ -206,7 +206,7 @@ export default function AdvancedIntelligenceSuite({
   const xai = buildXaiBreakdown(healthMetrics, batteryData);
   const baseSoH = Number(healthMetrics?.soh || 0);
   const twinData = buildDigitalTwinCurve({
-    baseSoh,
+    baseSoh: baseSoH,
     loadIncreasePct,
     ambientTempDeltaC,
     cycleStressPct,
@@ -264,7 +264,7 @@ export default function AdvancedIntelligenceSuite({
     curve: twinData,
     projected_dte: projectedDte,
     summary: {
-      baseSoh,
+      baseSoh: baseSoH,
       loadIncreasePct,
       ambientTempDeltaC,
       cycleStressPct,
@@ -292,7 +292,7 @@ export default function AdvancedIntelligenceSuite({
             edgeNodes: edgeClients
           }),
           postJson('/api/intelligence/digital-twin', {
-            baseSoh,
+            baseSoh: baseSoH,
             loadIncreasePct,
             ambientTempDeltaC,
             cycleStressPct,
