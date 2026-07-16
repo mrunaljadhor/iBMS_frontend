@@ -106,59 +106,96 @@ function localSampleTelemetry() {
 
 function localRouteDistance(body = {}) {
   const origin = parseLatLng(body.origin);
-  const destination = parseLatLng(body.destination);
+  let destination = parseLatLng(body.destination);
+  let waypoints = body.waypoints || [];
+  
+  if (body.roundTrip) {
+    waypoints = Array.isArray(waypoints) ? [...waypoints, body.destination] : [waypoints, body.destination];
+    destination = origin;
+  }
 
   if (!origin || !destination) {
     throw new Error('Origin and destination must be provided as "lat,lng" strings.');
   }
+  
+  const parsedWaypoints = (Array.isArray(waypoints) ? waypoints : [waypoints]).map(parseLatLng).filter(Boolean);
+  const routePoints = [origin, ...parsedWaypoints, destination];
+  
+  let totalDistanceKm = 0;
+  let legDetails = [];
+  
+  for (let i = 0; i < routePoints.length - 1; i++) {
+    const dist = haversineKm(routePoints[i], routePoints[i+1]);
+    totalDistanceKm += dist;
+    legDetails.push({
+      distance_km: dist,
+      duration_minutes: (dist / 35 * 60).toFixed(1)
+    });
+  }
 
-  const distanceKm = haversineKm(origin, destination);
-  const durationMinutes = distanceKm / 35 * 60;
+  const durationMinutes = totalDistanceKm / 35 * 60;
 
   return {
     origin: body.origin,
     destination: body.destination,
-    distance_km: distanceKm.toFixed(2),
-    distance_m: Math.round(distanceKm * 1000),
+    distance_km: totalDistanceKm.toFixed(2),
+    distance_m: Math.round(totalDistanceKm * 1000),
     duration_s: Math.round(durationMinutes * 60),
     duration_minutes: durationMinutes.toFixed(1),
     route_summary: 'Approximate Vercel-side route estimate',
-    legs: 1,
+    legs: legDetails,
   };
 }
 
 function localFeasibility(body = {}) {
   const currentSoc = Number(body.current_soc ?? 100);
-  const routeDistance = Number(body.route_distance_km ?? localRouteDistance(body).distance_km);
+  const routeResult = localRouteDistance(body);
+  const totalDistance = Number(routeResult.distance_km);
+  const legs = routeResult.legs;
+  
+  const chargeAtStops = body.chargeAtStops || false;
 
   const ecoDte = calculateDTE(currentSoc, 'ECO');
   const sportDte = calculateDTE(currentSoc, 'SPORT');
 
-  let status = 'SAFE';
+  let simulatedSoc = currentSoc;
+  let overallStatus = 'SAFE';
   let recommendation = 'Both ECO and SPORT modes available';
   let action = 'MANUAL_MODE';
   let alert = null;
-
-  if (routeDistance > ecoDte) {
-    status = 'IMPOSSIBLE';
-    recommendation = 'CHARGE REQUIRED - Cannot reach destination in ECO mode';
-    action = 'CHARGE_REQUIRED';
-    alert = 'Charge the battery before attempting this route.';
-  } else if (routeDistance > sportDte) {
-    status = 'CRITICAL';
-    recommendation = 'MUST USE ECO MODE - SPORT mode insufficient for route';
-    action = 'FORCE_ECO_MODE';
-    alert = 'SPORT mode will not be sufficient to reach destination.';
+  
+  for (let i = 0; i < legs.length; i++) {
+    const legDist = legs[i].distance_km;
+    const legEcoDte = calculateDTE(simulatedSoc, 'ECO');
+    const legSportDte = calculateDTE(simulatedSoc, 'SPORT');
+    
+    if (legDist > legEcoDte) {
+      overallStatus = 'IMPOSSIBLE';
+      recommendation = `CHARGE REQUIRED - Cannot reach leg ${i+1} in ECO mode`;
+      action = 'CHARGE_REQUIRED';
+      alert = 'Charge the battery before attempting this route.';
+      break;
+    } else if (legDist > legSportDte && overallStatus !== 'IMPOSSIBLE') {
+      overallStatus = 'CRITICAL';
+      recommendation = 'MUST USE ECO MODE - SPORT mode insufficient for route';
+      action = 'FORCE_ECO_MODE';
+      alert = 'SPORT mode will not be sufficient to reach destination.';
+    }
+    
+    simulatedSoc -= (legDist / legEcoDte) * simulatedSoc;
+    if (chargeAtStops && i < legs.length - 1) {
+      simulatedSoc = 100;
+    }
   }
 
   return {
-    route_distance_km: Number(routeDistance.toFixed(2)),
+    route_distance_km: Number(totalDistance.toFixed(2)),
     feasibility: {
-      status,
+      status: overallStatus,
       eco_dte: ecoDte,
       sport_dte: sportDte,
-      safety_margin_eco: ecoDte - routeDistance,
-      safety_margin_sport: sportDte - routeDistance,
+      safety_margin_eco: ecoDte - totalDistance,
+      safety_margin_sport: sportDte - totalDistance,
     },
     amsa_decision: {
       action,
@@ -283,6 +320,8 @@ function localDigitalTwin(body = {}) {
   const loadIncreasePct = Number(body.loadIncreasePct ?? 15);
   const ambientTempDeltaC = Number(body.ambientTempDeltaC ?? 6);
   const cycleStressPct = Number(body.cycleStressPct ?? 18);
+  const avgSpeedKmh = Number(body.avgSpeedKmh ?? 60);
+  const accelAggressionPct = Number(body.accelAggressionPct ?? 10);
   const days = Number(body.days ?? 7);
   const curve = [];
 
@@ -290,7 +329,8 @@ function localDigitalTwin(body = {}) {
   const tempAccel = Math.max(0, ambientTempDeltaC * 0.03);
   const loadAccel = (loadIncreasePct / 10) * 0.02;
   const cycleAccel = (cycleStressPct / 10) * 0.008;
-  const stressMultiplier = 1 + tempAccel + loadAccel + cycleAccel;
+  const accelAccel = (accelAggressionPct / 10) * 0.025;
+  const stressMultiplier = 1 + tempAccel + loadAccel + cycleAccel + accelAccel;
   const scenarioDegradationRate = baseDegradationRate * stressMultiplier;
 
   for (let day = 0; day <= days; day += 1) {
@@ -309,8 +349,14 @@ function localDigitalTwin(body = {}) {
   }
 
   const finalScenarioSoh = clamp(baseSoh - days * scenarioDegradationRate, 0, 100);
-  const scenarioDte = (finalScenarioSoh / 100) * BATTERY.nominalVoltageV * BATTERY.nominalCapacityAh / 150;
-  const baselineDte = (baseSoh / 100) * BATTERY.nominalVoltageV * BATTERY.nominalCapacityAh / 150;
+  
+  const speedFactor = Math.max(0.5, (avgSpeedKmh / 60.0) ** 2);
+  const accelFactor = 1.0 + (accelAggressionPct / 100.0) * 0.5;
+  const nominalConsumption = 150 * (1 + loadIncreasePct / 100.0);
+  const scenarioConsumption = 150 * speedFactor * accelFactor * (1 + loadIncreasePct / 100.0);
+  
+  const scenarioDte = (finalScenarioSoh / 100) * BATTERY.nominalVoltageV * BATTERY.nominalCapacityAh / scenarioConsumption;
+  const baselineDte = (baseSoh / 100) * BATTERY.nominalVoltageV * BATTERY.nominalCapacityAh / nominalConsumption;
 
   return {
     curve,
@@ -325,6 +371,8 @@ function localDigitalTwin(body = {}) {
       loadIncreasePct,
       ambientTempDeltaC,
       cycleStressPct,
+      avgSpeedKmh,
+      accelAggressionPct,
       stressMultiplier: Number(stressMultiplier.toFixed(3)),
       degradationRateBaseline: Number(baseDegradationRate.toFixed(3)),
       degradationRateScenario: Number(scenarioDegradationRate.toFixed(3)),
