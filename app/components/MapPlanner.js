@@ -7,6 +7,9 @@ export default function MapPlanner() {
   const [formData, setFormData] = useState({
     origin: '28.5355,77.3910',  // Default: Delhi
     destination: '28.7041,77.1025',  // Default: Noida
+    waypoints: '',
+    roundTrip: false,
+    chargeAtStops: false
   })
   
   const [routeData, setRouteData] = useState(null)
@@ -14,24 +17,37 @@ export default function MapPlanner() {
   const [mapUrl, setMapUrl] = useState(null)
 
   const handleInputChange = (e) => {
-    const { name, value } = e.target
-    setFormData(prev => ({ ...prev, [name]: value }))
+    const { name, value, type, checked } = e.target
+    setFormData(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }))
   }
 
   const calculateRoute = async (e) => {
     e.preventDefault()
     try {
       setLoading(true)
+      const payload = {
+        ...formData,
+        waypoints: formData.waypoints ? formData.waypoints.split('\n').map(s => s.trim()).filter(s => s) : []
+      }
+      
       const res = await fetch('/api/route/distance', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
+        body: JSON.stringify(payload)
       })
       const data = await res.json()
       setRouteData(data)
 
       // Generate Google Maps URL for display
-      const url = `https://www.google.com/maps/embed/v1/directions?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY}&origin=${formData.origin}&destination=${formData.destination}`
+      let waypointsStr = payload.waypoints.join('|')
+      if (payload.roundTrip) {
+         waypointsStr = waypointsStr ? `${waypointsStr}|${formData.destination}` : formData.destination
+      }
+      
+      const waypointsQuery = waypointsStr ? `&waypoints=${waypointsStr}` : ''
+      const destUrl = payload.roundTrip ? formData.origin : formData.destination
+      
+      const url = `https://www.google.com/maps/embed/v1/directions?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY}&origin=${formData.origin}&destination=${destUrl}${waypointsQuery}`
       setMapUrl(url)
     } catch (error) {
       console.error('Failed to calculate route:', error)
@@ -73,6 +89,41 @@ export default function MapPlanner() {
               />
               <p className="text-xs text-gray-500 mt-1">Noida: 28.7041,77.1025</p>
             </div>
+          </div>
+          
+          <div>
+            <label className="block text-sm text-gray-400 mb-2">Waypoints (One per line)</label>
+            <textarea
+              name="waypoints"
+              value={formData.waypoints}
+              onChange={handleInputChange}
+              placeholder="e.g., 28.5355,77.3910"
+              rows="2"
+              className="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2 text-white focus:border-blue-500 focus:outline-none"
+            />
+          </div>
+
+          <div className="flex gap-6 mt-2">
+            <label className="flex items-center space-x-2 text-sm text-gray-400">
+              <input
+                type="checkbox"
+                name="roundTrip"
+                checked={formData.roundTrip}
+                onChange={handleInputChange}
+                className="form-checkbox h-4 w-4 text-blue-500 rounded bg-gray-700 border-gray-600 focus:ring-blue-500 focus:ring-opacity-25"
+              />
+              <span>Round Trip</span>
+            </label>
+            <label className="flex items-center space-x-2 text-sm text-gray-400">
+              <input
+                type="checkbox"
+                name="chargeAtStops"
+                checked={formData.chargeAtStops}
+                onChange={handleInputChange}
+                className="form-checkbox h-4 w-4 text-blue-500 rounded bg-gray-700 border-gray-600 focus:ring-blue-500 focus:ring-opacity-25"
+              />
+              <span>Charge at Stops</span>
+            </label>
           </div>
 
           <button

@@ -189,6 +189,8 @@ export default function AdvancedIntelligenceSuite({
   const [loadIncreasePct, setLoadIncreasePct] = useState(15);
   const [ambientTempDeltaC, setAmbientTempDeltaC] = useState(6);
   const [cycleStressPct, setCycleStressPct] = useState(18);
+  const [avgSpeedKmh, setAvgSpeedKmh] = useState(60);
+  const [accelAggressionPct, setAccelAggressionPct] = useState(10);
   const [remoteAnalytics, setRemoteAnalytics] = useState({ whisperer: null, xai: null, federated: null, twin: null });
 
   const liveTemperature = Number(batteryData?.Max_Temp_C || batteryData?.temperature || 25);
@@ -208,6 +210,8 @@ export default function AdvancedIntelligenceSuite({
     loadIncreasePct,
     ambientTempDeltaC,
     cycleStressPct,
+    avgSpeedKmh,
+    accelAggressionPct,
     horizonDays: 7
   });
 
@@ -263,7 +267,9 @@ export default function AdvancedIntelligenceSuite({
       baseSoh,
       loadIncreasePct,
       ambientTempDeltaC,
-      cycleStressPct
+      cycleStressPct,
+      avgSpeedKmh,
+      accelAggressionPct
     }
   };
 
@@ -290,6 +296,8 @@ export default function AdvancedIntelligenceSuite({
             loadIncreasePct,
             ambientTempDeltaC,
             cycleStressPct,
+            avgSpeedKmh,
+            accelAggressionPct,
             days: 7
           })
         ]);
@@ -312,7 +320,7 @@ export default function AdvancedIntelligenceSuite({
     return () => {
       cancelled = true;
     };
-  }, [batteryData, baseSoH, cycleStressPct, datasetProfile, edgeClients, federatedRound, liveTemperature, loadIncreasePct, socSlider, ambientTempDeltaC]);
+  }, [batteryData, baseSoH, cycleStressPct, datasetProfile, edgeClients, federatedRound, liveTemperature, loadIncreasePct, socSlider, ambientTempDeltaC, avgSpeedKmh, accelAggressionPct]);
 
   const handleSend = async (nextQuestion) => {
     const trimmed = String(nextQuestion || question).trim();
@@ -570,6 +578,14 @@ export default function AdvancedIntelligenceSuite({
             <div style={miniCard}>
               <label style={{ display: 'block', marginBottom: '6px', color: '#cbd5e1', fontSize: '12px' }}>Cycle aggression: {cycleStressPct}%</label>
               <input type="range" min="0" max="30" value={cycleStressPct} onChange={(event) => setCycleStressPct(Number(event.target.value))} style={{ width: '100%' }} />
+            </div>
+            <div style={miniCard}>
+              <label style={{ display: 'block', marginBottom: '6px', color: '#cbd5e1', fontSize: '12px' }}>Avg Speed: {avgSpeedKmh} km/h</label>
+              <input type="range" min="20" max="120" value={avgSpeedKmh} onChange={(event) => setAvgSpeedKmh(Number(event.target.value))} style={{ width: '100%' }} />
+            </div>
+            <div style={miniCard}>
+              <label style={{ display: 'block', marginBottom: '6px', color: '#cbd5e1', fontSize: '12px' }}>Acceleration Aggression: {accelAggressionPct}%</label>
+              <input type="range" min="0" max="100" value={accelAggressionPct} onChange={(event) => setAccelAggressionPct(Number(event.target.value))} style={{ width: '100%' }} />
             </div>
           </div>
 
