@@ -26,18 +26,18 @@ export default function Dashboard() {
       setLoading(true)
       
       // Fetch sample predictions
-      const socRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/predict/sample`)
+      const socRes = await fetch('/api/predict/sample')
       const socData = await socRes.json()
       
       // Fetch DTE for both modes
-      const dteEcoRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/predict/dte`, {
+      const dteEcoRes = await fetch('/api/predict/dte', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ current_soc: socData.SOC || 75, drive_mode: 'ECO' })
       })
       const dteEcoData = await dteEcoRes.json()
       
-      const dteSportRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/predict/dte`, {
+      const dteSportRes = await fetch('/api/predict/dte', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ current_soc: socData.SOC || 75, drive_mode: 'SPORT' })

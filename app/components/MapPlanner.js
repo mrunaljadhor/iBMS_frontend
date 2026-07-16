@@ -22,7 +22,7 @@ export default function MapPlanner() {
     e.preventDefault()
     try {
       setLoading(true)
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/route/distance`, {
+      const res = await fetch('/api/route/distance', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData)

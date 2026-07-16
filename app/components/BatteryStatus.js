@@ -14,7 +14,7 @@ export default function BatteryStatus() {
   const fetchBatteryData = async () => {
     try {
       setLoading(true)
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/predict/sample`)
+      const res = await fetch('/api/predict/sample')
       const data = await res.json()
       setBatteryData(data)
     } catch (error) {

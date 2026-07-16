@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import LeftPanel from './LeftPanel';
 import OverviewAnalyticsPanel from './OverviewAnalyticsPanel';
+import AdvancedIntelligenceSuite from './AdvancedIntelligenceSuite';
 import RightMapPanel from './RightMapPanel';
 import { TRINITY_DATASET_PROFILE } from '../utils/trinityDatasetProfile';
 import { deriveDatasetProfileFromCsv } from '../utils/datasetProfile';
@@ -390,6 +391,15 @@ export default function ProfessionalDashboard() {
           calculateDTE={calculateDTE}
           estimateRangeAtSoc={estimateRangeAtSoc}
           batteryData={batteryData}
+          datasetProfile={activeDatasetProfile}
+        />
+
+        <AdvancedIntelligenceSuite
+          batteryData={batteryData}
+          drivingMode={drivingMode}
+          socSlider={socSlider}
+          routeDistance={routeDistance}
+          calculateDTE={calculateDTE}
           datasetProfile={activeDatasetProfile}
         />
 

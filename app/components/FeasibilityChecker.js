@@ -25,7 +25,7 @@ export default function FeasibilityChecker() {
     e.preventDefault()
     try {
       setLoading(true)
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/feasibility`, {
+      const res = await fetch('/api/feasibility', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData)
