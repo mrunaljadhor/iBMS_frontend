@@ -215,6 +215,11 @@ export default function AdvancedIntelligenceSuite({
     horizonDays: 7
   });
 
+  const scenarioDailyDrop = clamp((100 - baseSoH) * 0.0085 * (1 + loadIncreasePct * 0.018 + ambientTempDeltaC * 0.032 + cycleStressPct * 0.012), 0.05, 0.75);
+  const projectedRul = clamp((baseSoH - healthMetrics.eolThreshold) / (scenarioDailyDrop * 365), 0, 15);
+  const projectedDte = typeof calculateDTE === 'function' ? Math.max(0, Math.round(calculateDTE() * (1 - loadIncreasePct * 0.01) * (1 - ambientTempDeltaC * 0.004))) : 0;
+
+
   const federatedNodes = Array.from({ length: edgeClients }, (_, index) => {
     const nodeLoss = clamp(0.8 - (federatedRound * 0.04) - (index * 0.03), 0.12, 0.82);
     const nodeAccuracy = clamp(91.8 + (federatedRound * 0.72) + (index * 0.18), 90, 98.9);
@@ -377,9 +382,6 @@ export default function AdvancedIntelligenceSuite({
     }
   };
 
-  const scenarioDailyDrop = clamp((100 - baseSoH) * 0.0085 * (1 + loadIncreasePct * 0.018 + ambientTempDeltaC * 0.032 + cycleStressPct * 0.012), 0.05, 0.75);
-  const projectedRul = clamp((baseSoH - healthMetrics.eolThreshold) / (scenarioDailyDrop * 365), 0, 15);
-  const projectedDte = typeof calculateDTE === 'function' ? Math.max(0, Math.round(calculateDTE() * (1 - loadIncreasePct * 0.01) * (1 - ambientTempDeltaC * 0.004))) : 0;
   const twinCurve = twinDisplay.curve || twinData;
 
   return (
