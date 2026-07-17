@@ -29,11 +29,29 @@ function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
 }
 
-function calculateDTE(currentSoc, driveMode = 'ECO') {
-  const batteryCapacityWh = BATTERY.nominalCapacityAh * BATTERY.nominalVoltageV;
+function calculateDTE(currentSoc, driveMode = 'ECO', env = {}) {
+  const {
+    baseSoh = 100,
+    ambientTempDeltaC = 0,
+    avgSpeedKmh = 60,
+    accelAggressionPct = 0,
+    elevationGrade = 0
+  } = env;
+
+  const realSoh = clamp(baseSoh, 0, 100);
+  const batteryCapacityWh = (BATTERY.nominalCapacityAh * BATTERY.nominalVoltageV) * (realSoh / 100);
   const availableEnergy = (currentSoc / 100) * batteryCapacityWh;
-  const consumptionRate = driveMode === 'SPORT' ? BATTERY.sportConsumptionWhPerKm : BATTERY.ecoConsumptionWhPerKm;
-  return availableEnergy / consumptionRate;
+  
+  const baseConsumption = driveMode === 'SPORT' ? BATTERY.sportConsumptionWhPerKm : BATTERY.ecoConsumptionWhPerKm;
+  
+  const tempPenalty = 1 + Math.max(0, ambientTempDeltaC * 0.005);
+  const speedFactor = Math.max(0.5, (avgSpeedKmh / 60.0) ** 2);
+  const accelPenalty = 1 + (accelAggressionPct / 100) * 0.2;
+  const elevationPenalty = 1 + (elevationGrade > 0 ? elevationGrade * 0.12 : elevationGrade * 0.05);
+
+  const finalConsumptionRate = baseConsumption * speedFactor * accelPenalty * tempPenalty * elevationPenalty;
+  
+  return availableEnergy / finalConsumptionRate;
 }
 
 function parseLatLng(value) {
@@ -154,9 +172,17 @@ function localFeasibility(body = {}) {
   const legs = routeResult.legs;
   
   const chargeAtStops = body.chargeAtStops || false;
+  
+  const envParams = {
+    baseSoh: Number(body.baseSoh ?? 100),
+    ambientTempDeltaC: Number(body.ambientTempDeltaC ?? 0),
+    avgSpeedKmh: Number(body.avgSpeedKmh ?? 60),
+    accelAggressionPct: Number(body.accelAggressionPct ?? 0),
+    elevationGrade: 0 // Cannot easily fetch elevation on client side fallback without CORS
+  };
 
-  const ecoDte = calculateDTE(currentSoc, 'ECO');
-  const sportDte = calculateDTE(currentSoc, 'SPORT');
+  const ecoDte = calculateDTE(currentSoc, 'ECO', envParams);
+  const sportDte = calculateDTE(currentSoc, 'SPORT', envParams);
 
   let simulatedSoc = currentSoc;
   let overallStatus = 'SAFE';
@@ -166,8 +192,8 @@ function localFeasibility(body = {}) {
   
   for (let i = 0; i < legs.length; i++) {
     const legDist = legs[i].distance_km;
-    const legEcoDte = calculateDTE(simulatedSoc, 'ECO');
-    const legSportDte = calculateDTE(simulatedSoc, 'SPORT');
+    const legEcoDte = calculateDTE(simulatedSoc, 'ECO', envParams);
+    const legSportDte = calculateDTE(simulatedSoc, 'SPORT', envParams);
     
     if (legDist > legEcoDte) {
       overallStatus = 'IMPOSSIBLE';

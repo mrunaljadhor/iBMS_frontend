@@ -9,7 +9,11 @@ export default function MapPlanner() {
     destination: '28.7041,77.1025',  // Default: Noida
     waypoints: '',
     roundTrip: false,
-    chargeAtStops: false
+    chargeAtStops: false,
+    baseSoh: 100,
+    ambientTempDeltaC: 0,
+    avgSpeedKmh: 60,
+    accelAggressionPct: 0
   })
   
   const [routeData, setRouteData] = useState(null)
@@ -27,10 +31,14 @@ export default function MapPlanner() {
       setLoading(true)
       const payload = {
         ...formData,
+        baseSoh: Number(formData.baseSoh),
+        ambientTempDeltaC: Number(formData.ambientTempDeltaC),
+        avgSpeedKmh: Number(formData.avgSpeedKmh),
+        accelAggressionPct: Number(formData.accelAggressionPct),
         waypoints: formData.waypoints ? formData.waypoints.split('\n').map(s => s.trim()).filter(s => s) : []
       }
       
-      const res = await fetch('/api/route/distance', {
+      const res = await fetch('/api/feasibility', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -102,6 +110,32 @@ export default function MapPlanner() {
               className="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2 text-white focus:border-blue-500 focus:outline-none"
             />
           </div>
+          
+          <div className="border-t border-gray-700 pt-4 mt-4">
+            <h4 className="text-sm font-semibold text-gray-300 mb-4">Thermodynamics & Physics</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">Battery SoH (%)</label>
+                <input type="range" name="baseSoh" min="40" max="100" value={formData.baseSoh} onChange={handleInputChange} className="w-full" />
+                <div className="text-right text-xs text-gray-500">{formData.baseSoh}%</div>
+              </div>
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">Ambient Temp (+°C)</label>
+                <input type="range" name="ambientTempDeltaC" min="0" max="25" value={formData.ambientTempDeltaC} onChange={handleInputChange} className="w-full" />
+                <div className="text-right text-xs text-gray-500">+{formData.ambientTempDeltaC}°C</div>
+              </div>
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">Avg Speed (km/h)</label>
+                <input type="range" name="avgSpeedKmh" min="20" max="120" value={formData.avgSpeedKmh} onChange={handleInputChange} className="w-full" />
+                <div className="text-right text-xs text-gray-500">{formData.avgSpeedKmh} km/h</div>
+              </div>
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">Acceleration Aggression (%)</label>
+                <input type="range" name="accelAggressionPct" min="0" max="100" value={formData.accelAggressionPct} onChange={handleInputChange} className="w-full" />
+                <div className="text-right text-xs text-gray-500">{formData.accelAggressionPct}%</div>
+              </div>
+            </div>
+          </div>
 
           <div className="flex gap-6 mt-2">
             <label className="flex items-center space-x-2 text-sm text-gray-400">
@@ -162,6 +196,14 @@ export default function MapPlanner() {
               unit=""
               icon="🛣️"
               status="info"
+            />
+
+            <StatCard
+              title="Avg Route Elevation Grade"
+              value={routeData.feasibility?.envParams?.elevationGrade ? routeData.feasibility.envParams.elevationGrade.toFixed(2) : (routeData.elevationGrade ? routeData.elevationGrade.toFixed(2) : '0.00')}
+              unit="%"
+              icon="⛰️"
+              status="warning"
             />
           </div>
 
