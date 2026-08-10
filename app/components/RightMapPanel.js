@@ -574,6 +574,90 @@ export default function RightMapPanel({
     };
   };
 
+  const buildTomTomTrafficRoute = async (originCoords, destCoords) => {
+    const tomtomKey = process.env.NEXT_PUBLIC_TOMTOM_API_KEY;
+    if (!tomtomKey) {
+      throw new Error('TomTom API key not configured.');
+    }
+
+    const url = `https://api.tomtom.com/routing/1/calculateRoute/${originCoords.lat},${originCoords.lng}:${destCoords.lat},${destCoords.lng}/json?key=${tomtomKey}&sectionType=traffic&traffic=true`;
+
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error('TomTom routing service failed.');
+    }
+
+    const data = await response.json();
+    const routes = data?.routes;
+    if (!Array.isArray(routes) || routes.length === 0) {
+      throw new Error('No routes returned by TomTom.');
+    }
+
+    const candidates = routes.map((route, index) => {
+      const pts = route?.legs?.[0]?.points;
+      if (!pts || !pts.length) return null;
+      
+      const path = pts.map(p => ({ lat: p.latitude, lng: p.longitude }));
+      const distanceKm = Number((route.summary.lengthInMeters / 1000).toFixed(2));
+      const trafficMinutes = Number((route.summary.travelTimeInSeconds / 60).toFixed(1));
+      const delayMinutes = Number(((route.summary.trafficDelayInSeconds || 0) / 60).toFixed(1));
+      const staticMinutes = Number(Math.max(0, trafficMinutes - delayMinutes).toFixed(1));
+      
+      const delayRatio = staticMinutes > 0 ? delayMinutes / staticMinutes : 0;
+      const congestionRatio = staticMinutes > 0 ? Number((trafficMinutes / staticMinutes).toFixed(2)) : 1;
+      const severity = trafficSeverityFromDelay(delayRatio);
+      const effectiveDistance = Number((distanceKm * (1 + delayRatio * 0.35)).toFixed(2));
+
+      const sections = route.sections || [];
+      const segments = sections
+        .filter(s => s.sectionType === 'TRAFFIC')
+        .map((section, segmentIndex) => {
+           let speedCat = 'NORMAL';
+           if (section.simpleCategory === 'JAM') {
+               speedCat = 'TRAFFIC_JAM';
+           } else if (section.simpleCategory === 'ROAD_CLOSURE' || section.magnitudeOfDelay > 2) {
+               speedCat = 'TRAFFIC_JAM';
+           } else if (section.magnitudeOfDelay > 0) {
+               speedCat = 'SLOW';
+           } else if (section.delayInSeconds > 20) {
+               speedCat = 'SLOW';
+           }
+           
+           return {
+             id: `tt-${index}-${segmentIndex}`,
+             speed: speedCat,
+             color: trafficSegmentColor(speedCat),
+             path: path.slice(section.startPointIndex, Math.min(section.endPointIndex + 1, path.length))
+           };
+        });
+
+      return {
+        id: `tomtom-${index + 1}`,
+        path,
+        segments,
+        distanceKm,
+        trafficMinutes,
+        staticMinutes,
+        delayMinutes,
+        congestionRatio,
+        severity,
+        effectiveDistance,
+        routeProvider: 'tomtom-traffic',
+        hasLiveTraffic: true,
+        optimizationSummary: index === 0 ? 'TomTom live-traffic fallback route.' : 'TomTom alternative live-traffic route.'
+      };
+    }).filter(Boolean);
+
+    if (!candidates.length) {
+      throw new Error('Fallback route could not be generated from TomTom.');
+    }
+
+    return {
+      candidates,
+      routeProvider: 'tomtom-traffic'
+    };
+  };
+
   const buildOsrmRoute = async (originCoords, destCoords) => {
     const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${originCoords.lng},${originCoords.lat};${destCoords.lng},${destCoords.lat}?overview=full&alternatives=true&geometries=geojson`;
 
@@ -682,23 +766,38 @@ export default function RightMapPanel({
           }
           fitPathBounds(selectedRoute?.path);
         } catch {
-          const fallbackRoute = await buildOsrmRoute(originCoords, destCoords);
-          const candidates = fallbackRoute.candidates || [];
-          const selectedRoute = candidates[0];
+          try {
+            const tomtomRoute = await buildTomTomTrafficRoute(originCoords, destCoords);
+            const candidates = tomtomRoute.candidates || [];
+            const selectedRoute = candidates[0];
 
-          applySelectedRouteCandidate(
-            selectedRoute,
-            candidates,
-            'Google traffic services unavailable; using shortest fallback route.'
-          );
+            applySelectedRouteCandidate(
+              selectedRoute,
+              candidates,
+              'Google APIs unavailable; using TomTom live-traffic fallback.'
+            );
 
-          if (candidates.length > 1) {
-            setNotice('Showing OSRM fallback routes (no live traffic). Use Route Options to switch routes.');
-          } else {
-            setNotice('Showing fallback route. Enable Google Routes API for segment-level traffic colors.');
+            setNotice(`TomTom traffic-aware fallback selected from ${candidates.length} route options.`);
+            fitPathBounds(selectedRoute?.path);
+          } catch {
+            const fallbackRoute = await buildOsrmRoute(originCoords, destCoords);
+            const candidates = fallbackRoute.candidates || [];
+            const selectedRoute = candidates[0];
+
+            applySelectedRouteCandidate(
+              selectedRoute,
+              candidates,
+              'Google & TomTom traffic services unavailable; using shortest fallback route.'
+            );
+
+            if (candidates.length > 1) {
+              setNotice('Showing OSRM fallback routes (no live traffic). Use Route Options to switch routes.');
+            } else {
+              setNotice('Showing plain fallback route. Enable TomTom/Google API for traffic segments.');
+            }
+
+            fitPathBounds(selectedRoute?.path);
           }
-
-          fitPathBounds(selectedRoute?.path);
         }
       }
     } catch (routeError) {
