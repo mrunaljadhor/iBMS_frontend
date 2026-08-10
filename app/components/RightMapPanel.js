@@ -580,7 +580,7 @@ export default function RightMapPanel({
       throw new Error('TomTom API key not configured.');
     }
 
-    const url = `https://api.tomtom.com/routing/1/calculateRoute/${originCoords.lat},${originCoords.lng}:${destCoords.lat},${destCoords.lng}/json?key=${tomtomKey}&sectionType=traffic&traffic=true`;
+    const url = `https://api.tomtom.com/routing/1/calculateRoute/${originCoords.lat},${originCoords.lng}:${destCoords.lat},${destCoords.lng}/json?key=${tomtomKey}&sectionType=traffic&traffic=true&maxAlternatives=2`;
 
     const response = await fetch(url);
     if (!response.ok) {
@@ -594,8 +594,11 @@ export default function RightMapPanel({
     }
 
     const candidates = routes.map((route, index) => {
-      const pts = route?.legs?.[0]?.points;
-      if (!pts || !pts.length) return null;
+      const pts = [];
+      route?.legs?.forEach(leg => {
+          if (leg.points) pts.push(...leg.points);
+      });
+      if (!pts.length) return null;
       
       const path = pts.map(p => ({ lat: p.latitude, lng: p.longitude }));
       const distanceKm = Number((route.summary.lengthInMeters / 1000).toFixed(2));
@@ -611,21 +614,7 @@ export default function RightMapPanel({
       const sections = route.sections || [];
       const trafficSections = sections.filter(s => s.sectionType === 'TRAFFIC');
       
-      const segments = [];
-      let currentIdx = 0;
-
-      trafficSections.forEach((section, segmentIndex) => {
-         // Generate NORMAL segment for the gap before this traffic jam
-         if (section.startPointIndex > currentIdx) {
-            segments.push({
-               id: `tt-${index}-norm-${segmentIndex}`,
-               speed: 'NORMAL',
-               color: trafficSegmentColor('NORMAL'),
-               path: path.slice(currentIdx, section.startPointIndex + 1)
-            });
-         }
-         
-         // Generate the TRAFFIC segment
+      const segments = trafficSections.map((section, segmentIndex) => {
          let speedCat = 'NORMAL';
          if (section.simpleCategory === 'JAM' || section.simpleCategory === 'ROAD_CLOSURE' || section.magnitudeOfDelay > 2) {
              speedCat = 'TRAFFIC_JAM';
@@ -633,25 +622,13 @@ export default function RightMapPanel({
              speedCat = 'SLOW';
          }
          
-         segments.push({
+         return {
              id: `tt-${index}-traf-${segmentIndex}`,
              speed: speedCat,
              color: trafficSegmentColor(speedCat),
              path: path.slice(section.startPointIndex, Math.min(section.endPointIndex + 1, path.length))
-         });
-         
-         currentIdx = section.endPointIndex;
-      });
-
-      // Generate NORMAL segment for the remaining path after the last traffic jam
-      if (currentIdx < path.length - 1) {
-         segments.push({
-            id: `tt-${index}-norm-end`,
-            speed: 'NORMAL',
-            color: trafficSegmentColor('NORMAL'),
-            path: path.slice(currentIdx, path.length)
-         });
-      }
+         };
+      }).filter(s => s.speed !== 'NORMAL');
 
       return {
         id: `tomtom-${index + 1}`,
@@ -1269,27 +1246,13 @@ export default function RightMapPanel({
                   path={candidate.path}
                   options={{
                     strokeColor: getRouteColorByIndex(index),
-                    strokeOpacity: isSelected
-                      ? (trafficSegments.length > 0 ? 0.34 : 0.95)
-                      : 0.68,
-                    strokeWeight: isSelected ? 7 : 5,
-                    zIndex: isSelected ? 10 : 6
+                    strokeOpacity: isSelected ? 0.85 : 0.4,
+                    strokeWeight: isSelected ? 5 : 4,
+                    zIndex: isSelected ? 2 : 1
                   }}
                 />
               );
             })}
-
-            {routeCandidates.length === 0 && fallbackRoutePath.length > 0 && (
-              <Polyline
-                key={`selected-route-${selectedRouteId || 'default'}`}
-                path={fallbackRoutePath}
-                options={{
-                  strokeColor: '#3b82f6',
-                  strokeOpacity: trafficSegments.length > 0 ? 0.28 : 0.45,
-                  strokeWeight: 7
-                }}
-              />
-            )}
 
             {trafficSegments.map((segment) => (
               segment.path.length > 1 && (
@@ -1298,9 +1261,9 @@ export default function RightMapPanel({
                   path={segment.path}
                   options={{
                     strokeColor: segment.color,
-                    strokeOpacity: 0.92,
-                    strokeWeight: 6,
-                    zIndex: 20
+                    strokeOpacity: 1.0,
+                    strokeWeight: 7,
+                    zIndex: 3
                   }}
                 />
               )
