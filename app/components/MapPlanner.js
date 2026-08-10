@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import StatCard from './StatCard'
+import { GoogleMap, useJsApiLoader, DirectionsRenderer, TrafficLayer } from '@react-google-maps/api'
 
 export default function MapPlanner() {
   const [formData, setFormData] = useState({
@@ -18,7 +19,12 @@ export default function MapPlanner() {
   
   const [routeData, setRouteData] = useState(null)
   const [loading, setLoading] = useState(false)
-  const [mapUrl, setMapUrl] = useState(null)
+  const [directionsResponse, setDirectionsResponse] = useState(null)
+
+  const { isLoaded } = useJsApiLoader({
+    id: 'google-map-script',
+    googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY || 'YOUR_GOOGLE_MAPS_API_KEY'
+  })
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target
@@ -46,17 +52,33 @@ export default function MapPlanner() {
       const data = await res.json()
       setRouteData(data)
 
-      // Generate Google Maps URL for display
-      let waypointsStr = payload.waypoints.join('|')
-      if (payload.roundTrip) {
-         waypointsStr = waypointsStr ? `${waypointsStr}|${formData.destination}` : formData.destination
+      // Generate Google Maps JS API Route for rendering
+      if (isLoaded && window.google) {
+        const directionsService = new window.google.maps.DirectionsService()
+        
+        let wypts = []
+        if (payload.waypoints && payload.waypoints.length > 0) {
+          wypts = payload.waypoints.map(w => ({ location: w, stopover: true }))
+        }
+        
+        let finalDest = formData.destination
+        if (payload.roundTrip) {
+          wypts.push({ location: formData.destination, stopover: true })
+          finalDest = formData.origin
+        }
+        
+        try {
+          const results = await directionsService.route({
+            origin: formData.origin,
+            destination: finalDest,
+            waypoints: wypts,
+            travelMode: window.google.maps.TravelMode.DRIVING
+          })
+          setDirectionsResponse(results)
+        } catch (err) {
+          console.error("DirectionsService failed:", err)
+        }
       }
-      
-      const waypointsQuery = waypointsStr ? `&waypoints=${waypointsStr}` : ''
-      const destUrl = payload.roundTrip ? formData.origin : formData.destination
-      
-      const url = `https://www.google.com/maps/embed/v1/directions?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY}&origin=${formData.origin}&destination=${destUrl}${waypointsQuery}`
-      setMapUrl(url)
     } catch (error) {
       console.error('Failed to calculate route:', error)
     } finally {
@@ -208,16 +230,40 @@ export default function MapPlanner() {
           </div>
 
           {/* Map Embed */}
-          {mapUrl && (
+          {directionsResponse && isLoaded && (
             <div className="card">
               <h4 className="text-lg font-semibold mb-4">Route Map</h4>
-              <iframe
-                width="100%"
-                height="450"
-                style={{ border: 0, borderRadius: '8px' }}
-                loading="lazy"
-                src={mapUrl}
-              ></iframe>
+              <div style={{ width: '100%', height: '450px', borderRadius: '8px', overflow: 'hidden' }}>
+                <GoogleMap
+                  mapContainerStyle={{ width: '100%', height: '100%' }}
+                  zoom={10}
+                  center={{ lat: 28.6139, lng: 77.2090 }}
+                  options={{
+                    disableDefaultUI: true,
+                    zoomControl: true,
+                    styles: [
+                      { elementType: "geometry", stylers: [{ color: "#1e293b" }] },
+                      { elementType: "labels.text.stroke", stylers: [{ color: "#1e293b" }] },
+                      { elementType: "labels.text.fill", stylers: [{ color: "#94a3b8" }] },
+                      { featureType: "road", elementType: "geometry", stylers: [{ color: "#334155" }] },
+                      { featureType: "road", elementType: "geometry.stroke", stylers: [{ color: "#1e293b" }] },
+                      { featureType: "water", elementType: "geometry", stylers: [{ color: "#0f172a" }] },
+                    ]
+                  }}
+                >
+                  <TrafficLayer />
+                  <DirectionsRenderer
+                    directions={directionsResponse}
+                    options={{
+                      polylineOptions: {
+                        strokeColor: '#3b82f6',
+                        strokeOpacity: 0.35,
+                        strokeWeight: 7
+                      }
+                    }}
+                  />
+                </GoogleMap>
+              </div>
             </div>
           )}
         </>
