@@ -609,27 +609,49 @@ export default function RightMapPanel({
       const effectiveDistance = Number((distanceKm * (1 + delayRatio * 0.35)).toFixed(2));
 
       const sections = route.sections || [];
-      const segments = sections
-        .filter(s => s.sectionType === 'TRAFFIC')
-        .map((section, segmentIndex) => {
-           let speedCat = 'NORMAL';
-           if (section.simpleCategory === 'JAM') {
-               speedCat = 'TRAFFIC_JAM';
-           } else if (section.simpleCategory === 'ROAD_CLOSURE' || section.magnitudeOfDelay > 2) {
-               speedCat = 'TRAFFIC_JAM';
-           } else if (section.magnitudeOfDelay > 0) {
-               speedCat = 'SLOW';
-           } else if (section.delayInSeconds > 20) {
-               speedCat = 'SLOW';
-           }
-           
-           return {
-             id: `tt-${index}-${segmentIndex}`,
+      const trafficSections = sections.filter(s => s.sectionType === 'TRAFFIC');
+      
+      const segments = [];
+      let currentIdx = 0;
+
+      trafficSections.forEach((section, segmentIndex) => {
+         // Generate NORMAL segment for the gap before this traffic jam
+         if (section.startPointIndex > currentIdx) {
+            segments.push({
+               id: `tt-${index}-norm-${segmentIndex}`,
+               speed: 'NORMAL',
+               color: trafficSegmentColor('NORMAL'),
+               path: path.slice(currentIdx, section.startPointIndex + 1)
+            });
+         }
+         
+         // Generate the TRAFFIC segment
+         let speedCat = 'NORMAL';
+         if (section.simpleCategory === 'JAM' || section.simpleCategory === 'ROAD_CLOSURE' || section.magnitudeOfDelay > 2) {
+             speedCat = 'TRAFFIC_JAM';
+         } else if (section.magnitudeOfDelay > 0 || section.delayInSeconds > 20) {
+             speedCat = 'SLOW';
+         }
+         
+         segments.push({
+             id: `tt-${index}-traf-${segmentIndex}`,
              speed: speedCat,
              color: trafficSegmentColor(speedCat),
              path: path.slice(section.startPointIndex, Math.min(section.endPointIndex + 1, path.length))
-           };
-        });
+         });
+         
+         currentIdx = section.endPointIndex;
+      });
+
+      // Generate NORMAL segment for the remaining path after the last traffic jam
+      if (currentIdx < path.length - 1) {
+         segments.push({
+            id: `tt-${index}-norm-end`,
+            speed: 'NORMAL',
+            color: trafficSegmentColor('NORMAL'),
+            path: path.slice(currentIdx, path.length)
+         });
+      }
 
       return {
         id: `tomtom-${index + 1}`,
