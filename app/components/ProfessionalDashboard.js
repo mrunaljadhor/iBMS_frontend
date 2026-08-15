@@ -130,6 +130,7 @@ export default function ProfessionalDashboard() {
   const [routeDistance, setRouteDistance] = useState(25); // in km
   const [updateRoute, setUpdateRoute] = useState(false);
   const [userRole, setUserRole] = useState('user'); // 'user' or 'analyst'
+  const [routeInfo, setRouteInfo] = useState(null);
 
   const applyDatasetProfile = (profile) => {
     setActiveDatasetProfile(profile);
@@ -475,6 +476,7 @@ export default function ProfessionalDashboard() {
               calculateDTE={calculateDTE}
               routeDistance={routeDistance}
               datasetProfile={activeDatasetProfile}
+              routeInfo={routeInfo}
             />
           </div>
 
@@ -492,6 +494,7 @@ export default function ProfessionalDashboard() {
               setRouteDistance={setRouteDistance}
               socSlider={socSlider}
               datasetProfile={activeDatasetProfile}
+              onRouteInfoUpdate={setRouteInfo}
             />
           </div>
         </div>

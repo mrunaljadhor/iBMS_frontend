@@ -93,7 +93,8 @@ export default function RightMapPanel({
   routeDistance,
   setRouteDistance,
   socSlider,
-  datasetProfile
+  datasetProfile,
+  onRouteInfoUpdate
 }) {
 
   const mapRef = useRef(null);
@@ -152,7 +153,7 @@ export default function RightMapPanel({
 
     setFallbackRoutePath(candidate.path || []);
     setTrafficSegments(candidate.segments || []);
-    setRouteInfo({
+    const newRouteInfo = {
       distance: candidate.distanceKm,
       duration: candidate.staticMinutes,
       staticDuration: candidate.staticMinutes,
@@ -168,7 +169,12 @@ export default function RightMapPanel({
       socAdjustedDistance: socAdjustedOutputs.socAdjustedDistance,
       alternativesEvaluated: candidates.length || 1,
       optimizationSummary: optimizationSummary || candidate.optimizationSummary || ''
-    });
+    };
+    
+    setRouteInfo(newRouteInfo);
+    if (onRouteInfoUpdate) {
+      onRouteInfoUpdate(newRouteInfo);
+    }
     setRouteDistance(socAdjustedOutputs.socAdjustedDistance);
     setSelectedRouteId(candidate.id || '');
     setRouteCandidates(candidates);
@@ -1398,87 +1404,6 @@ export default function RightMapPanel({
         </div>
       </div>
 
-      <div style={{
-        background: 'linear-gradient(160deg, rgba(8, 10, 14, 0.96) 0%, rgba(2, 3, 6, 0.96) 100%)',
-        border: `2px solid ${getStatusColor(dteStatus)}`,
-        borderRadius: '12px',
-        padding: '24px',
-        boxShadow: `0 10px 30px ${getStatusColor(dteStatus)}22`
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-          <h3 style={{ fontSize: '18px', fontWeight: 'bold', color: getStatusColor(dteStatus) }}>Charging Recommendation</h3>
-          <span style={{ fontSize: '11px', color: getStatusColor(dteStatus), letterSpacing: '0.1em', textTransform: 'uppercase', border: `1px solid ${getStatusColor(dteStatus)}99`, borderRadius: '9999px', padding: '4px 10px' }}>
-            Charge
-          </span>
-        </div>
-        <p style={{ fontSize: '14px', color: '#d1d5db' }}>
-          {dteStatus === 'safe'
-            ? 'Battery level is sufficient for the trip under current traffic.'
-            : dteStatus === 'critical'
-              ? 'Traffic load reduces margin. Charging before departure is recommended.'
-              : 'Immediate charging is required for this route under live traffic.'}
-        </p>
-        <div style={{ marginTop: '16px', padding: '12px', backgroundColor: 'rgba(51, 65, 85, 0.4)', borderRadius: '8px' }}>
-          <p style={{ fontSize: '12px', color: '#9ca3af' }}>
-            Current SOC: <span style={{ color: '#60a5fa', fontWeight: 'bold' }}>{socSlider}%</span>
-          </p>
-          <p style={{ fontSize: '12px', color: '#9ca3af', marginTop: '8px' }}>
-            Congestion Ratio: <span style={{ color: trafficColor, fontWeight: 'bold' }}>{routeInfo.congestionRatio}x</span>
-          </p>
-        </div>
-      </div>
-
-      <div style={{
-        background: 'linear-gradient(160deg, rgba(8, 10, 14, 0.96) 0%, rgba(2, 3, 6, 0.96) 100%)',
-        border: `1px solid ${getSOHColor(soh)}`,
-        borderRadius: '12px',
-        padding: '24px',
-        boxShadow: '0 10px 30px rgba(0, 0, 0, 0.45)'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-          <h3 style={{ fontSize: '18px', fontWeight: 'bold', color: 'white' }}>State of Health (SOH)</h3>
-          <span style={{ fontSize: '11px', color: '#38bdf8', letterSpacing: '0.1em', textTransform: 'uppercase', border: '1px solid rgba(56, 189, 248, 0.45)', borderRadius: '9999px', padding: '4px 10px' }}>
-            Health
-          </span>
-        </div>
-
-        <div style={{ marginBottom: '16px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-            <span style={{ fontSize: '14px', color: '#9ca3af' }}>Battery Health Status</span>
-            <span style={{ fontSize: '28px', fontWeight: 'bold', color: getSOHColor(soh) }}>
-              {soh.toFixed(1)}%
-            </span>
-          </div>
-          <div style={{
-            height: '16px',
-            backgroundColor: 'rgba(55, 65, 81, 0.5)',
-            borderRadius: '9999px',
-            overflow: 'hidden',
-            border: '1px solid #4b5563'
-          }}>
-            <div style={{
-              height: '100%',
-              width: `${Math.min(soh, 100)}%`,
-              background: `linear-gradient(90deg, ${getSOHColor(soh)} 0%, ${getSOHColor(soh)} 100%)`,
-              transition: 'width 0.5s ease',
-              boxShadow: `0 0 15px ${getSOHColor(soh)}`
-            }} />
-          </div>
-        </div>
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '12px', color: '#9ca3af' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px', backgroundColor: 'rgba(51, 65, 85, 0.3)', borderRadius: '6px' }}>
-            <span>Temperature Impact</span>
-            <span style={{ color: '#60a5fa' }}>{healthMetrics.tempPenalty.toFixed(1)}%</span>
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px', backgroundColor: 'rgba(51, 65, 85, 0.3)', borderRadius: '6px' }}>
-            <span>Cell Imbalance Risk</span>
-            <span style={{ color: healthMetrics.imbalancePenalty > 5 ? '#f59e0b' : '#10b981' }}>
-              {healthMetrics.imbalancePenalty.toFixed(1)}%
-            </span>
-          </div>
-        </div>
-      </div>
     </div>
   );
 }

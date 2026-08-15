@@ -3,7 +3,7 @@
 import { calculateBatteryHealthMetrics } from '../utils/batteryHealth';
 import { TRINITY_DATASET_PROFILE } from '../utils/trinityDatasetProfile';
 
-export default function LeftPanel({ userRole, batteryData, drivingMode, setDrivingMode, socSlider, setSocSlider, calculateDTE, routeDistance, datasetProfile }) {
+export default function LeftPanel({ userRole, batteryData, drivingMode, setDrivingMode, socSlider, setSocSlider, calculateDTE, routeDistance, datasetProfile, routeInfo }) {
   const dte = calculateDTE();
   const AMAS_SPORT_LOCK_SOC_THRESHOLD = 40;
   const isSportLocked = socSlider < AMAS_SPORT_LOCK_SOC_THRESHOLD;
@@ -428,28 +428,68 @@ export default function LeftPanel({ userRole, batteryData, drivingMode, setDrivi
           </div>
         )}
 
-        {/* DTE Display */}
-        <div style={{
-          background: 'linear-gradient(160deg, rgba(7, 10, 14, 0.95) 0%, rgba(2, 4, 8, 0.95) 100%)',
-          border: `1px solid ${getStatusColor(dteStatus)}`,
-          borderRadius: '12px',
-          padding: '24px',
-          textAlign: 'center'
-        }}>
-          <p style={{ fontSize: '12px', fontWeight: 'bold', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '12px' }}>Distance to Empty</p>
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: '12px', justifyContent: 'center' }}>
-            <p style={{ fontSize: '48px', fontWeight: 'bold', color: '#06b6d4' }}>{dte}</p>
-            <p style={{ color: '#9ca3af', fontSize: '18px' }}>km</p>
+        {/* DTE Display & Charging Recommendation */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+          
+          {/* DTE Display */}
+          <div style={{
+            background: 'linear-gradient(160deg, rgba(7, 10, 14, 0.95) 0%, rgba(2, 4, 8, 0.95) 100%)',
+            border: `1px solid ${getStatusColor(dteStatus)}`,
+            borderRadius: '12px',
+            padding: '24px',
+            textAlign: 'center'
+          }}>
+            <p style={{ fontSize: '12px', fontWeight: 'bold', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '12px' }}>Distance to Empty</p>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: '12px', justifyContent: 'center' }}>
+              <p style={{ fontSize: '48px', fontWeight: 'bold', color: '#06b6d4' }}>{dte}</p>
+              <p style={{ color: '#9ca3af', fontSize: '18px' }}>km</p>
+            </div>
+            <p style={{ fontSize: '12px', color: '#6b7280', marginTop: '8px' }}>Consumption: {drivingMode === 'ECO' ? '150' : '250'} Wh/km</p>
+            {routeDistance && (
+              <div style={{ marginTop: '16px', borderTop: '1px solid rgba(71, 85, 105, 0.5)', paddingTop: '16px' }}>
+                <p style={{ fontSize: '12px', color: '#9ca3af', marginBottom: '8px' }}>Route Distance: <span style={{ color: getStatusColor(dteStatus), fontWeight: 'bold' }}>{routeDistance} km</span></p>
+                <p style={{ fontSize: '14px', fontWeight: 'bold', color: getStatusColor(dteStatus) }}>
+                  {dteStatus === 'safe' ? 'SAFE - Sufficient for journey' : dteStatus === 'critical' ? 'CRITICAL - Consider charging' : 'IMPOSSIBLE - Charging required'}
+                </p>
+              </div>
+            )}
           </div>
-          <p style={{ fontSize: '12px', color: '#6b7280', marginTop: '8px' }}>Consumption: {drivingMode === 'ECO' ? '150' : '250'} Wh/km</p>
-          {routeDistance && (
-            <div style={{ marginTop: '16px', borderTop: '1px solid rgba(71, 85, 105, 0.5)', paddingTop: '16px' }}>
-              <p style={{ fontSize: '12px', color: '#9ca3af', marginBottom: '8px' }}>Route Distance: <span style={{ color: getStatusColor(dteStatus), fontWeight: 'bold' }}>{routeDistance} km</span></p>
-              <p style={{ fontSize: '14px', fontWeight: 'bold', color: getStatusColor(dteStatus) }}>
-                {dteStatus === 'safe' ? 'SAFE - Sufficient for journey' : dteStatus === 'critical' ? 'CRITICAL - Consider charging' : 'IMPOSSIBLE - Charging required'}
+
+          {/* CHARGING RECOMMENDATION */}
+          <div style={{
+            background: 'linear-gradient(160deg, rgba(7, 10, 14, 0.95) 0%, rgba(2, 4, 8, 0.95) 100%)',
+            border: `1px solid ${getStatusColor(dteStatus)}`,
+            borderRadius: '12px',
+            padding: '24px',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'space-between'
+          }}>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+                <h3 style={{ fontSize: '15px', fontWeight: 'bold', color: getStatusColor(dteStatus) }}>Charging Recommendation</h3>
+                <span style={{ fontSize: '10px', color: getStatusColor(dteStatus), letterSpacing: '0.1em', textTransform: 'uppercase', border: `1px solid ${getStatusColor(dteStatus)}99`, borderRadius: '9999px', padding: '3px 8px' }}>
+                  Charge
+                </span>
+              </div>
+              <p style={{ fontSize: '13px', color: '#d1d5db', lineHeight: 1.5 }}>
+                {dteStatus === 'safe'
+                  ? 'Battery level is sufficient for the trip under current traffic.'
+                  : dteStatus === 'critical'
+                    ? 'Traffic load reduces margin. Charging before departure is recommended.'
+                    : 'Immediate charging is required for this route under live traffic.'}
               </p>
             </div>
-          )}
+            
+            <div style={{ marginTop: '16px', padding: '12px', backgroundColor: 'rgba(51, 65, 85, 0.4)', borderRadius: '8px' }}>
+              <p style={{ fontSize: '12px', color: '#9ca3af' }}>
+                Current SOC: <span style={{ color: '#60a5fa', fontWeight: 'bold' }}>{socSlider.toFixed(1)}%</span>
+              </p>
+              <p style={{ fontSize: '12px', color: '#9ca3af', marginTop: '8px' }}>
+                Congestion Ratio: <span style={{ color: routeInfo?.congestionRatio > 1.2 ? '#ef4444' : routeInfo?.congestionRatio > 1.05 ? '#f59e0b' : '#22c55e', fontWeight: 'bold' }}>{routeInfo?.congestionRatio || 1}x</span>
+              </p>
+            </div>
+          </div>
         </div>
       </div>
 
