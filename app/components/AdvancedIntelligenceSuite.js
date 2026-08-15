@@ -508,6 +508,7 @@ export default function AdvancedIntelligenceSuite({
               <p style={{ color: '#f8fafc', fontSize: '13px' }}>{xaiDisplay.signal}</p>
             </div>
           </div>
+          </>
         )}
 
         {userRole === 'analyst' && (
