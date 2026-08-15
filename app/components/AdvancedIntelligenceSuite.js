@@ -175,6 +175,7 @@ async function postJson(path, body) {
 }
 
 export default function AdvancedIntelligenceSuite({
+  userRole,
   batteryData,
   drivingMode,
   socSlider,
@@ -396,11 +397,13 @@ export default function AdvancedIntelligenceSuite({
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '18px' }}>
-        <div style={suiteCard}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
-            <h4 style={{ fontSize: '15px', color: '#e2e8f0', fontWeight: 700 }}>Battery Whisperer</h4>
-            <span className="badge-info">RAG Ready</span>
-          </div>
+        {userRole !== 'analyst' && (
+          <>
+            <div style={suiteCard}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
+                <h4 style={{ fontSize: '15px', color: '#e2e8f0', fontWeight: 700 }}>Battery Whisperer</h4>
+                <span className="badge-info">RAG Ready</span>
+              </div>
 
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '12px' }}>
             {whispererPrompts.map((prompt) => (
@@ -500,17 +503,19 @@ export default function AdvancedIntelligenceSuite({
             ))}
           </div>
 
-          <div style={{ marginTop: '12px', ...miniCard }}>
-            <p style={{ fontSize: '12px', color: '#94a3b8', marginBottom: '4px' }}>Current signal</p>
-            <p style={{ color: '#f8fafc', fontSize: '13px' }}>{xaiDisplay.signal}</p>
+            <div style={{ marginTop: '12px', ...miniCard }}>
+              <p style={{ fontSize: '12px', color: '#94a3b8', marginBottom: '4px' }}>Current signal</p>
+              <p style={{ color: '#f8fafc', fontSize: '13px' }}>{xaiDisplay.signal}</p>
+            </div>
           </div>
-        </div>
+        )}
 
-        <div style={suiteCard}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
-            <h4 style={{ fontSize: '15px', color: '#e2e8f0', fontWeight: 700 }}>Federated Learning</h4>
-            <span className="badge-success">Edge-Cloud</span>
-          </div>
+        {userRole === 'analyst' && (
+          <div style={suiteCard}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
+              <h4 style={{ fontSize: '15px', color: '#e2e8f0', fontWeight: 700 }}>Federated Learning</h4>
+              <span className="badge-success">Edge-Cloud</span>
+            </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '10px', marginBottom: '12px' }}>
             <div style={miniCard}>
@@ -557,16 +562,18 @@ export default function AdvancedIntelligenceSuite({
             </div>
           </div>
 
-          <button className="btn-secondary" onClick={handleRunFederatedRound} style={{ width: '100%', marginTop: '12px' }}>
-            Aggregate next round
-          </button>
-        </div>
-
-        <div style={suiteCard}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
-            <h4 style={{ fontSize: '15px', color: '#e2e8f0', fontWeight: 700 }}>Digital Twin Simulator</h4>
-            <span className="badge-danger">What-If</span>
+            <button className="btn-secondary" onClick={handleRunFederatedRound} style={{ width: '100%', marginTop: '12px' }}>
+              Aggregate next round
+            </button>
           </div>
+        )}
+
+        {userRole !== 'analyst' && (
+          <div style={suiteCard}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
+              <h4 style={{ fontSize: '15px', color: '#e2e8f0', fontWeight: 700 }}>Digital Twin Simulator</h4>
+              <span className="badge-danger">What-If</span>
+            </div>
 
           <div style={{ display: 'grid', gap: '10px', marginBottom: '12px' }}>
             <div style={miniCard}>
@@ -617,10 +624,11 @@ export default function AdvancedIntelligenceSuite({
             </ResponsiveContainer>
           </div>
 
-          <p style={{ color: '#cbd5e1', fontSize: '12px' }}>
-            Scenario change is being evaluated against the live pack context in {drivingMode} mode with {Number(routeDistance || 0)} km route pressure and {Number(calculateDTE?.() || 0)} km available DTE.
-          </p>
-        </div>
+            <p style={{ color: '#cbd5e1', fontSize: '12px' }}>
+              Scenario change is being evaluated against the live pack context in {drivingMode} mode with {Number(routeDistance || 0)} km route pressure and {Number(calculateDTE?.() || 0)} km available DTE.
+            </p>
+          </div>
+        )}
       </div>
     </section>
   );

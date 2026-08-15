@@ -63,6 +63,7 @@ const pieTooltipValueStyle = {
 };
 
 export default function OverviewAnalyticsPanel({
+  userRole,
   socSlider,
   drivingMode,
   routeDistance,
@@ -286,106 +287,108 @@ export default function OverviewAnalyticsPanel({
         </div>
       </div>
 
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-        gap: '18px'
-      }}>
-        <div style={chartCardStyle}>
-          <h4 style={{ fontSize: '14px', color: '#cbd5e1', marginBottom: '12px', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
-            Charge Composition
-          </h4>
-          <div style={{ width: '100%', height: '200px' }}>
-            <ResponsiveContainer>
-              <PieChart>
-                <Pie
-                  data={socPieData}
-                  dataKey="value"
-                  nameKey="name"
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={50}
-                  outerRadius={78}
-                  paddingAngle={2}
-                  stroke="none"
-                >
-                  {socPieData.map((entry, index) => (
-                    <Cell key={`soc-cell-${entry.name}`} fill={socColors[index % socColors.length]} />
-                  ))}
-                </Pie>
-                <Tooltip content={renderPieTooltip} wrapperStyle={{ outline: 'none' }} />
-                <Legend wrapperStyle={{ fontSize: '11px', color: '#cbd5e1' }} />
-              </PieChart>
-            </ResponsiveContainer>
+      {userRole === 'analyst' && (
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+          gap: '18px'
+        }}>
+          <div style={chartCardStyle}>
+            <h4 style={{ fontSize: '14px', color: '#cbd5e1', marginBottom: '12px', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+              Charge Composition
+            </h4>
+            <div style={{ width: '100%', height: '200px' }}>
+              <ResponsiveContainer>
+                <PieChart>
+                  <Pie
+                    data={socPieData}
+                    dataKey="value"
+                    nameKey="name"
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={50}
+                    outerRadius={78}
+                    paddingAngle={2}
+                    stroke="none"
+                  >
+                    {socPieData.map((entry, index) => (
+                      <Cell key={`soc-cell-${entry.name}`} fill={socColors[index % socColors.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip content={renderPieTooltip} wrapperStyle={{ outline: 'none' }} />
+                  <Legend wrapperStyle={{ fontSize: '11px', color: '#cbd5e1' }} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
           </div>
-        </div>
 
-        <div style={chartCardStyle}>
-          <h4 style={{ fontSize: '14px', color: '#cbd5e1', marginBottom: '12px', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
-            Route Utilization
-          </h4>
-          <div style={{ width: '100%', height: '200px' }}>
-            <ResponsiveContainer>
-              <PieChart>
-                <Pie
-                  data={routeUtilizationData}
-                  dataKey="value"
-                  nameKey="name"
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={50}
-                  outerRadius={78}
-                  paddingAngle={2}
-                  stroke="none"
-                >
-                  {routeUtilizationData.map((entry, index) => (
-                    <Cell key={`route-cell-${entry.name}`} fill={utilizationColors[index % utilizationColors.length]} />
-                  ))}
-                </Pie>
-                <Tooltip content={renderPieTooltip} wrapperStyle={{ outline: 'none' }} />
-                <Legend wrapperStyle={{ fontSize: '11px', color: '#cbd5e1' }} />
-              </PieChart>
-            </ResponsiveContainer>
+          <div style={chartCardStyle}>
+            <h4 style={{ fontSize: '14px', color: '#cbd5e1', marginBottom: '12px', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+              Route Utilization
+            </h4>
+            <div style={{ width: '100%', height: '200px' }}>
+              <ResponsiveContainer>
+                <PieChart>
+                  <Pie
+                    data={routeUtilizationData}
+                    dataKey="value"
+                    nameKey="name"
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={50}
+                    outerRadius={78}
+                    paddingAngle={2}
+                    stroke="none"
+                  >
+                    {routeUtilizationData.map((entry, index) => (
+                      <Cell key={`route-cell-${entry.name}`} fill={utilizationColors[index % utilizationColors.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip content={renderPieTooltip} wrapperStyle={{ outline: 'none' }} />
+                  <Legend wrapperStyle={{ fontSize: '11px', color: '#cbd5e1' }} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
           </div>
-        </div>
 
-        <div style={chartCardStyle}>
-          <h4 style={{ fontSize: '14px', color: '#cbd5e1', marginBottom: '12px', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
-            Range Projection by SOC
-          </h4>
-          <div style={{ width: '100%', height: '200px' }}>
-            <ResponsiveContainer>
-              <LineChart data={projectionData} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(148, 163, 184, 0.18)" />
-                <XAxis dataKey="soc" tick={{ fill: '#94a3b8', fontSize: 11 }} unit="%" />
-                <YAxis tick={{ fill: '#94a3b8', fontSize: 11 }} unit=" km" />
-                <Tooltip contentStyle={tooltipStyle} />
-                <Line type="monotone" dataKey="range" stroke="#22d3ee" strokeWidth={3} dot={{ r: 3, fill: '#22d3ee' }} />
-              </LineChart>
-            </ResponsiveContainer>
+          <div style={chartCardStyle}>
+            <h4 style={{ fontSize: '14px', color: '#cbd5e1', marginBottom: '12px', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+              Range Projection by SOC
+            </h4>
+            <div style={{ width: '100%', height: '200px' }}>
+              <ResponsiveContainer>
+                <LineChart data={projectionData} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(148, 163, 184, 0.18)" />
+                  <XAxis dataKey="soc" tick={{ fill: '#94a3b8', fontSize: 11 }} unit="%" />
+                  <YAxis tick={{ fill: '#94a3b8', fontSize: 11 }} unit=" km" />
+                  <Tooltip contentStyle={tooltipStyle} />
+                  <Line type="monotone" dataKey="range" stroke="#22d3ee" strokeWidth={3} dot={{ r: 3, fill: '#22d3ee' }} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
           </div>
-        </div>
 
-        <div style={chartCardStyle}>
-          <h4 style={{ fontSize: '14px', color: '#cbd5e1', marginBottom: '12px', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
-            Health Stress Factors
-          </h4>
-          <div style={{ width: '100%', height: '200px' }}>
-            <ResponsiveContainer>
-              <BarChart data={stressData} margin={{ top: 5, right: 0, left: -15, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(148, 163, 184, 0.18)" />
-                <XAxis dataKey="name" tick={{ fill: '#94a3b8', fontSize: 11 }} />
-                <YAxis tick={{ fill: '#94a3b8', fontSize: 11 }} />
-                <Bar dataKey="value" radius={[4, 4, 0, 0]}>
-                  {stressData.map((entry, index) => (
-                    <Cell key={`stress-cell-${entry.name}`} fill={stressColors[index % stressColors.length]} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+          <div style={chartCardStyle}>
+            <h4 style={{ fontSize: '14px', color: '#cbd5e1', marginBottom: '12px', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+              Health Stress Factors
+            </h4>
+            <div style={{ width: '100%', height: '200px' }}>
+              <ResponsiveContainer>
+                <BarChart data={stressData} margin={{ top: 5, right: 0, left: -15, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(148, 163, 184, 0.18)" />
+                  <XAxis dataKey="name" tick={{ fill: '#94a3b8', fontSize: 11 }} />
+                  <YAxis tick={{ fill: '#94a3b8', fontSize: 11 }} />
+                  <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+                    {stressData.map((entry, index) => (
+                      <Cell key={`stress-cell-${entry.name}`} fill={stressColors[index % stressColors.length]} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

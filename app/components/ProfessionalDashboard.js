@@ -129,6 +129,7 @@ export default function ProfessionalDashboard() {
   const [destination, setDestination] = useState({ lat: 28.5821, lng: 77.3662, name: 'Noida' });
   const [routeDistance, setRouteDistance] = useState(25); // in km
   const [updateRoute, setUpdateRoute] = useState(false);
+  const [userRole, setUserRole] = useState('user'); // 'user' or 'analyst'
 
   const applyDatasetProfile = (profile) => {
     setActiveDatasetProfile(profile);
@@ -242,20 +243,68 @@ export default function ProfessionalDashboard() {
       <div style={{ maxWidth: '1600px', margin: '0 auto' }}>
         {/* Premium Header */}
         <div style={{ marginBottom: '36px' }} className="slide-up">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '14px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{
+                width: '6px',
+                height: '34px',
+                background: 'linear-gradient(180deg, #22c55e 0%, #0ea5e9 100%)',
+                borderRadius: '9999px'
+              }}></div>
+              <h1 style={{
+                fontSize: '40px',
+                fontWeight: 700,
+                color: '#f8fafc',
+                letterSpacing: '0.02em',
+                fontFamily: "'Sora', 'Segoe UI', sans-serif",
+                margin: 0
+              }}>iBMS FOR EVs</h1>
+            </div>
+
+            {/* Role Toggle Switch */}
             <div style={{
-              width: '6px',
-              height: '34px',
-              background: 'linear-gradient(180deg, #22c55e 0%, #0ea5e9 100%)',
-              borderRadius: '9999px'
-            }}></div>
-            <h1 style={{
-              fontSize: '40px',
-              fontWeight: 700,
-              color: '#f8fafc',
-              letterSpacing: '0.02em',
-              fontFamily: "'Sora', 'Segoe UI', sans-serif"
-            }}>iBMS FOR EVs</h1>
+              display: 'flex',
+              background: 'rgba(15, 23, 42, 0.6)',
+              border: '1px solid rgba(71, 85, 105, 0.5)',
+              borderRadius: '999px',
+              padding: '4px',
+              gap: '4px'
+            }}>
+              <button
+                onClick={() => setUserRole('user')}
+                style={{
+                  padding: '8px 20px',
+                  borderRadius: '999px',
+                  border: 'none',
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  background: userRole === 'user' ? 'linear-gradient(135deg, #2563eb 0%, #3b82f6 100%)' : 'transparent',
+                  color: userRole === 'user' ? '#fff' : '#94a3b8',
+                  transition: 'all 0.3s ease',
+                  boxShadow: userRole === 'user' ? '0 4px 12px rgba(59, 130, 246, 0.3)' : 'none'
+                }}
+              >
+                User View
+              </button>
+              <button
+                onClick={() => setUserRole('analyst')}
+                style={{
+                  padding: '8px 20px',
+                  borderRadius: '999px',
+                  border: 'none',
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  background: userRole === 'analyst' ? 'linear-gradient(135deg, #059669 0%, #10b981 100%)' : 'transparent',
+                  color: userRole === 'analyst' ? '#fff' : '#94a3b8',
+                  transition: 'all 0.3s ease',
+                  boxShadow: userRole === 'analyst' ? '0 4px 12px rgba(16, 185, 129, 0.3)' : 'none'
+                }}
+              >
+                Analyst View
+              </button>
+            </div>
           </div>
           <p style={{ color: '#94a3b8', marginLeft: '18px', fontSize: '14px', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
             Real-Time Monitoring | Predictive Battery Health | Route Intelligence
@@ -385,6 +434,7 @@ export default function ProfessionalDashboard() {
         </div>
 
         <OverviewAnalyticsPanel
+          userRole={userRole}
           socSlider={socSlider}
           drivingMode={drivingMode}
           routeDistance={routeDistance}
@@ -395,6 +445,7 @@ export default function ProfessionalDashboard() {
         />
 
         <AdvancedIntelligenceSuite
+          userRole={userRole}
           batteryData={batteryData}
           drivingMode={drivingMode}
           socSlider={socSlider}
@@ -413,6 +464,7 @@ export default function ProfessionalDashboard() {
           {/* LEFT PANEL - 50% */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', overflowY: 'auto', paddingRight: '16px' }}>
             <LeftPanel
+              userRole={userRole}
               batteryData={batteryData}
               drivingMode={drivingMode}
               setDrivingMode={setDrivingMode}
