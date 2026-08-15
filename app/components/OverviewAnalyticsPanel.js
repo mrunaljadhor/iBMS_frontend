@@ -226,8 +226,10 @@ export default function OverviewAnalyticsPanel({
   const kpiData = [
     { label: 'SOC', value: `${socSlider.toFixed(1)}%`, accent: '#22c55e' },
     { label: 'DTE', value: `${dte} km`, accent: '#38bdf8' },
-    { label: 'SOH', value: `${healthMetrics.soh.toFixed(1)}%`, accent: '#a78bfa' },
-    { label: 'RUL', value: `${healthMetrics.rulYears.toFixed(1)} yrs`, accent: '#f59e0b' },
+    ...(userRole === 'analyst' ? [
+      { label: 'SOH', value: `${healthMetrics.soh.toFixed(1)}%`, accent: '#a78bfa' },
+      { label: 'RUL', value: `${healthMetrics.rulYears.toFixed(1)} yrs`, accent: '#f59e0b' }
+    ] : []),
     { label: 'Route', value: `${routeDistance || 0} km`, accent: '#f43f5e' },
     {
       label: 'Mode',

@@ -444,15 +444,17 @@ export default function ProfessionalDashboard() {
           datasetProfile={activeDatasetProfile}
         />
 
-        <AdvancedIntelligenceSuite
-          userRole={userRole}
-          batteryData={batteryData}
-          drivingMode={drivingMode}
-          socSlider={socSlider}
-          routeDistance={routeDistance}
-          calculateDTE={calculateDTE}
-          datasetProfile={activeDatasetProfile}
-        />
+        {userRole === 'analyst' && (
+          <AdvancedIntelligenceSuite
+            userRole={userRole}
+            batteryData={batteryData}
+            drivingMode={drivingMode}
+            socSlider={socSlider}
+            routeDistance={routeDistance}
+            calculateDTE={calculateDTE}
+            datasetProfile={activeDatasetProfile}
+          />
+        )}
 
         {/* Main Dashboard - Split Screen (50/50) */}
         <div style={{
@@ -493,6 +495,18 @@ export default function ProfessionalDashboard() {
             />
           </div>
         </div>
+
+        {userRole === 'user' && (
+          <AdvancedIntelligenceSuite
+            userRole={userRole}
+            batteryData={batteryData}
+            drivingMode={drivingMode}
+            socSlider={socSlider}
+            routeDistance={routeDistance}
+            calculateDTE={calculateDTE}
+            datasetProfile={activeDatasetProfile}
+          />
+        )}
       </div>
     </div>
   );
