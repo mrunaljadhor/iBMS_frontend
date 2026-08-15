@@ -427,8 +427,9 @@ export default function LeftPanel({ userRole, batteryData, drivingMode, setDrivi
             AMAS RECOMMENDATION: SOC {socSlider.toFixed(1)}% - switch to ECO for better range. SPORT is still allowed until SOC goes below {AMAS_SPORT_LOCK_SOC_THRESHOLD}%.
           </div>
         )}
+      </div>
 
-        {/* DTE Display & Charging Recommendation */}
+      {/* DTE Display & Charging Recommendation */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
           
           {/* DTE Display */}
@@ -491,7 +492,6 @@ export default function LeftPanel({ userRole, batteryData, drivingMode, setDrivi
             </div>
           </div>
         </div>
-      </div>
 
       {userRole === 'analyst' && (
         <>
