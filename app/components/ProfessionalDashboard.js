@@ -445,17 +445,7 @@ export default function ProfessionalDashboard() {
           datasetProfile={activeDatasetProfile}
         />
 
-        {userRole === 'analyst' && (
-          <AdvancedIntelligenceSuite
-            userRole={userRole}
-            batteryData={batteryData}
-            drivingMode={drivingMode}
-            socSlider={socSlider}
-            routeDistance={routeDistance}
-            calculateDTE={calculateDTE}
-            datasetProfile={activeDatasetProfile}
-          />
-        )}
+
 
         {/* Main Dashboard - Split Screen (50/50) */}
         <div style={{
@@ -480,22 +470,34 @@ export default function ProfessionalDashboard() {
             />
           </div>
 
-          {/* RIGHT PANEL - 50% with Google Maps */}
+          {/* RIGHT PANEL - 50% */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', overflowY: 'auto', paddingRight: '16px' }}>
-            <RightMapPanel
-              origin={origin}
-              setOrigin={setOrigin}
-              destination={destination}
-              setDestination={setDestination}
-              batteryData={batteryData}
-              drivingMode={drivingMode}
-              calculateDTE={calculateDTE}
-              routeDistance={routeDistance}
-              setRouteDistance={setRouteDistance}
-              socSlider={socSlider}
-              datasetProfile={activeDatasetProfile}
-              onRouteInfoUpdate={setRouteInfo}
-            />
+            {userRole !== 'analyst' ? (
+              <RightMapPanel
+                origin={origin}
+                setOrigin={setOrigin}
+                destination={destination}
+                setDestination={setDestination}
+                batteryData={batteryData}
+                drivingMode={drivingMode}
+                calculateDTE={calculateDTE}
+                routeDistance={routeDistance}
+                setRouteDistance={setRouteDistance}
+                socSlider={socSlider}
+                datasetProfile={activeDatasetProfile}
+                onRouteInfoUpdate={setRouteInfo}
+              />
+            ) : (
+              <AdvancedIntelligenceSuite
+                userRole={userRole}
+                batteryData={batteryData}
+                drivingMode={drivingMode}
+                socSlider={socSlider}
+                routeDistance={routeDistance}
+                calculateDTE={calculateDTE}
+                datasetProfile={activeDatasetProfile}
+              />
+            )}
           </div>
         </div>
 
