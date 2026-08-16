@@ -569,7 +569,7 @@ export default function AdvancedIntelligenceSuite({
           </div>
         )}
 
-        <>
+        {userRole === 'analyst' && (
           <div style={suiteCard}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
               <h4 style={{ fontSize: '15px', color: '#e2e8f0', fontWeight: 700 }}>Digital Twin Simulator</h4>
@@ -610,28 +610,26 @@ export default function AdvancedIntelligenceSuite({
             </div>
           </div>
 
-          {userRole === 'analyst' && (
-            <div style={{ width: '100%', height: '220px', marginBottom: '10px' }}>
-              <ResponsiveContainer>
-                <LineChart data={twinCurve}>
-                  <CartesianGrid stroke="rgba(148, 163, 184, 0.18)" strokeDasharray="3 3" />
-                  <XAxis dataKey="day" stroke="#94a3b8" fontSize={11} />
-                  <YAxis domain={[0, 100]} stroke="#94a3b8" fontSize={11} />
-                  <Tooltip
-                    contentStyle={{ background: '#020617', border: '1px solid rgba(148, 163, 184, 0.25)', borderRadius: '10px', color: '#e2e8f0' }}
-                  />
-                  <Line type="monotone" dataKey="baseline" stroke="#38bdf8" strokeWidth={3} dot={false} name="Baseline SoH" />
-                  <Line type="monotone" dataKey="scenario" stroke="#f97316" strokeWidth={3} dot={false} name="What-if SoH" />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          )}
+          <div style={{ width: '100%', height: '220px', marginBottom: '10px' }}>
+            <ResponsiveContainer>
+              <LineChart data={twinCurve}>
+                <CartesianGrid stroke="rgba(148, 163, 184, 0.18)" strokeDasharray="3 3" />
+                <XAxis dataKey="day" stroke="#94a3b8" fontSize={11} />
+                <YAxis domain={[0, 100]} stroke="#94a3b8" fontSize={11} />
+                <Tooltip
+                  contentStyle={{ background: '#020617', border: '1px solid rgba(148, 163, 184, 0.25)', borderRadius: '10px', color: '#e2e8f0' }}
+                />
+                <Line type="monotone" dataKey="baseline" stroke="#38bdf8" strokeWidth={3} dot={false} name="Baseline SoH" />
+                <Line type="monotone" dataKey="scenario" stroke="#f97316" strokeWidth={3} dot={false} name="What-if SoH" />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
 
             <p style={{ color: '#cbd5e1', fontSize: '12px' }}>
               Scenario change is being evaluated against the live pack context in {drivingMode} mode with {Number(routeDistance || 0)} km route pressure and {Number(calculateDTE?.() || 0)} km available DTE.
             </p>
           </div>
-        </>
+        )}
       </div>
     </section>
   );
