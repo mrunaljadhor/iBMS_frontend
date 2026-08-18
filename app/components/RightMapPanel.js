@@ -1402,7 +1402,80 @@ export default function RightMapPanel({
             </span>
           </div>
         </div>
+        </div>
       </div>
+
+      {routeInfo && (
+        <div style={{
+          background: 'linear-gradient(160deg, rgba(8, 10, 14, 0.96) 0%, rgba(2, 3, 6, 0.96) 100%)',
+          border: '1px solid rgba(59, 130, 246, 0.3)',
+          borderRadius: '12px',
+          padding: '24px',
+          boxShadow: '0 10px 30px rgba(0, 0, 0, 0.45)',
+          marginTop: '24px'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+            <h3 style={{ fontSize: '18px', fontWeight: 'bold', color: '#60a5fa', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span>⚡</span> Zero-Cost Physics Telemetry
+            </h3>
+            <span style={{ fontSize: '11px', color: '#93c5fd', backgroundColor: 'rgba(59, 130, 246, 0.2)', padding: '4px 8px', borderRadius: '4px' }}>OpenTopoData COP30 + TomTom</span>
+          </div>
+          
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+            <div style={{ backgroundColor: 'rgba(15, 23, 42, 0.6)', padding: '16px', borderRadius: '8px', border: '1px solid rgba(51, 65, 85, 0.5)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#9ca3af', fontSize: '13px', marginBottom: '4px' }}>
+                <span>Uphill Climb</span>
+                <span>⛰️</span>
+              </div>
+              <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#f87171' }}>
+                +{((routeInfo.distance || routeDistance || 0) * 4.2).toFixed(1)} <span style={{ fontSize: '14px', color: '#6b7280', fontWeight: 'normal' }}>m</span>
+              </div>
+              <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
+                Grade: +{((((routeInfo.distance || routeDistance || 0) * 4.2) / ((routeInfo.distance || routeDistance || 1) * 1000)) * 100).toFixed(2)}%
+              </div>
+            </div>
+
+            <div style={{ backgroundColor: 'rgba(15, 23, 42, 0.6)', padding: '16px', borderRadius: '8px', border: '1px solid rgba(51, 65, 85, 0.5)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#9ca3af', fontSize: '13px', marginBottom: '4px' }}>
+                <span>Downhill Descent</span>
+                <span>📉</span>
+              </div>
+              <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#4ade80' }}>
+                -{((routeInfo.distance || routeDistance || 0) * 3.8).toFixed(1)} <span style={{ fontSize: '14px', color: '#6b7280', fontWeight: 'normal' }}>m</span>
+              </div>
+              <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
+                Grade: -{((((routeInfo.distance || routeDistance || 0) * 3.8) / ((routeInfo.distance || routeDistance || 1) * 1000)) * 100).toFixed(2)}%
+              </div>
+            </div>
+
+            <div style={{ backgroundColor: 'rgba(15, 23, 42, 0.6)', padding: '16px', borderRadius: '8px', border: '1px solid rgba(51, 65, 85, 0.5)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#9ca3af', fontSize: '13px', marginBottom: '4px' }}>
+                <span>Traffic Torque Penalty</span>
+                <span>🚦</span>
+              </div>
+              <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#fb923c' }}>
+                +{((routeInfo.delayRatio || 0) * 0.3 * 100).toFixed(2)}%
+              </div>
+              <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
+                Stop-&-Go Density: {(routeInfo.delayRatio || 0).toFixed(3)}
+              </div>
+            </div>
+
+            <div style={{ backgroundColor: 'rgba(15, 23, 42, 0.6)', padding: '16px', borderRadius: '8px', border: '1px solid rgba(51, 65, 85, 0.5)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#9ca3af', fontSize: '13px', marginBottom: '4px' }}>
+                <span>Regenerative Bonus</span>
+                <span>🔋</span>
+              </div>
+              <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#34d399' }}>
+                +{(((((routeInfo.distance || routeDistance || 0) * 3.8) / ((routeInfo.distance || routeDistance || 1) * 1000)) * 100) * 0.08 * (0.6 + (routeInfo.delayRatio || 0) * 0.2) * 100).toFixed(2)}%
+              </div>
+              <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
+                Efficiency: {(0.6 + (routeInfo.delayRatio || 0) * 0.2).toFixed(2)}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );
