@@ -1453,10 +1453,10 @@ export default function RightMapPanel({
                 <span>🚦</span>
               </div>
               <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#fb923c' }}>
-                +{((routeInfo.delayRatio || 0) * 0.3 * 100).toFixed(2)}%
+                +{(((routeInfo.delayMinutes || 0) / (routeInfo.staticDuration || 1)) * 0.3 * 100).toFixed(2)}%
               </div>
               <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
-                Stop-&-Go Density: {(routeInfo.delayRatio || 0).toFixed(3)}
+                Stop-&-Go Density: {((routeInfo.delayMinutes || 0) / (routeInfo.staticDuration || 1)).toFixed(3)}
               </div>
             </div>
 
@@ -1466,10 +1466,10 @@ export default function RightMapPanel({
                 <span>🔋</span>
               </div>
               <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#34d399' }}>
-                +{(((((routeInfo.distance || routeDistance || 0) * 3.8) / ((routeInfo.distance || routeDistance || 1) * 1000)) * 100) * 0.08 * (0.6 + (routeInfo.delayRatio || 0) * 0.2) * 100).toFixed(2)}%
+                +{(((((routeInfo.distance || routeDistance || 0) * 3.8) / ((routeInfo.distance || routeDistance || 1) * 1000)) * 100) * 0.08 * (0.6 + ((routeInfo.delayMinutes || 0) / (routeInfo.staticDuration || 1)) * 0.2) * 100).toFixed(2)}%
               </div>
               <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
-                Efficiency: {(0.6 + (routeInfo.delayRatio || 0) * 0.2).toFixed(2)}
+                Efficiency: {(0.6 + ((routeInfo.delayMinutes || 0) / (routeInfo.staticDuration || 1)) * 0.2).toFixed(2)}
               </div>
             </div>
           </div>
