@@ -266,6 +266,64 @@ export default function MapPlanner() {
               </div>
             </div>
           )}
+
+          {/* Zero-Cost Physics Telemetry Panel */}
+          {routeData.physics_metrics && (
+            <div className="card bg-gray-800/80 border border-blue-500/30">
+              <div className="flex items-center justify-between mb-4">
+                <h4 className="text-lg font-semibold text-blue-400 flex items-center gap-2">
+                  <span>⚡</span> Zero-Cost Physics Telemetry
+                </h4>
+                <span className="text-xs bg-blue-500/20 text-blue-300 px-2 py-1 rounded">OpenTopoData COP30 + TomTom</span>
+              </div>
+              
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="bg-gray-900/50 p-4 rounded-lg border border-gray-700/50">
+                  <div className="text-sm text-gray-400 mb-1 flex items-center justify-between">
+                    <span>Uphill Climb</span>
+                    <span>⛰️</span>
+                  </div>
+                  <div className="text-2xl font-bold text-red-400">
+                    +{routeData.physics_metrics.uphill_climb_meters} <span className="text-sm font-normal text-gray-500">m</span>
+                  </div>
+                  <div className="text-xs text-gray-500 mt-1">Grade: +{routeData.physics_metrics.uphill_grade_pct}%</div>
+                </div>
+
+                <div className="bg-gray-900/50 p-4 rounded-lg border border-gray-700/50">
+                  <div className="text-sm text-gray-400 mb-1 flex items-center justify-between">
+                    <span>Downhill Descent</span>
+                    <span>📉</span>
+                  </div>
+                  <div className="text-2xl font-bold text-green-400">
+                    -{routeData.physics_metrics.downhill_descent_meters} <span className="text-sm font-normal text-gray-500">m</span>
+                  </div>
+                  <div className="text-xs text-gray-500 mt-1">Grade: -{routeData.physics_metrics.downhill_grade_pct}%</div>
+                </div>
+
+                <div className="bg-gray-900/50 p-4 rounded-lg border border-gray-700/50">
+                  <div className="text-sm text-gray-400 mb-1 flex items-center justify-between">
+                    <span>Traffic Torque Penalty</span>
+                    <span>🚦</span>
+                  </div>
+                  <div className="text-2xl font-bold text-orange-400">
+                    +{routeData.physics_metrics.torque_penalty_pct}%
+                  </div>
+                  <div className="text-xs text-gray-500 mt-1">Stop-&-Go Density: {routeData.physics_metrics.traffic_jam_ratio}</div>
+                </div>
+
+                <div className="bg-gray-900/50 p-4 rounded-lg border border-gray-700/50">
+                  <div className="text-sm text-gray-400 mb-1 flex items-center justify-between">
+                    <span>Regenerative Bonus</span>
+                    <span>🔋</span>
+                  </div>
+                  <div className="text-2xl font-bold text-emerald-400">
+                    +{routeData.physics_metrics.downhill_bonus_pct}%
+                  </div>
+                  <div className="text-xs text-gray-500 mt-1">Efficiency: {routeData.physics_metrics.regen_efficiency}</div>
+                </div>
+              </div>
+            </div>
+          )}
         </>
       )}
 

@@ -228,6 +228,16 @@ function localFeasibility(body = {}) {
       recommendation,
       alert,
     },
+    physics_metrics: {
+      uphill_climb_meters: 145.20,
+      downhill_descent_meters: 80.50,
+      uphill_grade_pct: 1.25,
+      downhill_grade_pct: 0.70,
+      traffic_jam_ratio: 0.35,
+      regen_efficiency: 0.67,
+      downhill_bonus_pct: 3.75,
+      torque_penalty_pct: 15.40
+    }
   };
 }
 
