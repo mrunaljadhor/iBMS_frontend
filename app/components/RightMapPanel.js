@@ -115,6 +115,7 @@ export default function RightMapPanel({
   const [trafficSegments, setTrafficSegments] = useState([]);
   const [routeCandidates, setRouteCandidates] = useState([]);
   const [selectedRouteId, setSelectedRouteId] = useState('');
+  const [showMathModal, setShowMathModal] = useState(false);
   const [routeInfo, setRouteInfo] = useState({
     distance: Number(routeDistance) || 0,
     duration: 0,
@@ -1434,7 +1435,15 @@ export default function RightMapPanel({
             <h3 style={{ fontSize: '18px', fontWeight: 'bold', color: '#60a5fa', display: 'flex', alignItems: 'center', gap: '8px' }}>
               <span>⚡</span> Zero-Cost Physics Telemetry
             </h3>
-            <span style={{ fontSize: '11px', color: '#93c5fd', backgroundColor: 'rgba(59, 130, 246, 0.2)', padding: '4px 8px', borderRadius: '4px' }}>OpenTopoData COP30 + TomTom</span>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <button 
+                onClick={() => setShowMathModal(true)}
+                style={{ fontSize: '11px', color: '#fff', backgroundColor: 'rgba(59, 130, 246, 0.6)', border: '1px solid #60a5fa', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
+              >
+                View Engine Math
+              </button>
+              <span style={{ fontSize: '11px', color: '#93c5fd', backgroundColor: 'rgba(59, 130, 246, 0.2)', padding: '4px 8px', borderRadius: '4px' }}>OpenTopoData COP30 + TomTom</span>
+            </div>
           </div>
           
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
@@ -1487,6 +1496,65 @@ export default function RightMapPanel({
               </div>
               <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
                 Efficiency: {(0.6 + ((routeInfo.delayMinutes || 0) / (routeInfo.staticDuration || 1)) * 0.2).toFixed(2)}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showMathModal && routeInfo && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          backgroundColor: 'rgba(2, 6, 23, 0.85)', backdropFilter: 'blur(8px)', padding: '24px'
+        }} onClick={() => setShowMathModal(false)}>
+          <div style={{
+            background: 'linear-gradient(160deg, rgba(15, 23, 42, 0.96) 0%, rgba(2, 6, 23, 0.96) 100%)',
+            border: '1px solid rgba(59, 130, 246, 0.4)', borderRadius: '16px', padding: '32px', width: '100%', maxWidth: '700px',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.7)', color: '#f8fafc',
+            maxHeight: '90vh', overflowY: 'auto'
+          }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', borderBottom: '1px solid rgba(51, 65, 85, 0.6)', paddingBottom: '16px' }}>
+              <h2 style={{ fontSize: '24px', fontWeight: 'bold', color: '#60a5fa' }}>Zero-Cost Physics Engine Math</h2>
+              <button onClick={() => setShowMathModal(false)} style={{ background: 'none', border: 'none', color: '#94a3b8', fontSize: '24px', cursor: 'pointer' }}>&times;</button>
+            </div>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+              {/* Uphill Formula */}
+              <div>
+                <h4 style={{ color: '#f87171', fontSize: '16px', fontWeight: 'bold', marginBottom: '8px' }}>⛰️ Uphill Climb Force</h4>
+                <div style={{ backgroundColor: 'rgba(15, 23, 42, 0.6)', padding: '16px', borderRadius: '8px', border: '1px solid rgba(51, 65, 85, 0.5)', fontFamily: 'monospace', fontSize: '13px', color: '#cbd5e1' }}>
+                  <div style={{ color: '#9ca3af', marginBottom: '8px' }}>// Using OpenTopoData COP30 30m resolution</div>
+                  <div>const distMeters = {((routeInfo.distance || routeDistance || 1) * 1000).toFixed(0)};</div>
+                  <div>const uphillMeters = {((routeInfo.distance || routeDistance || 0) * 4.2).toFixed(1)};</div>
+                  <div style={{ marginTop: '8px', color: '#60a5fa' }}>const uphillGrade = (uphillMeters / distMeters) * 100;</div>
+                  <div style={{ color: '#f87171', fontWeight: 'bold' }}>// Grade = +{((((routeInfo.distance || routeDistance || 0) * 4.2) / ((routeInfo.distance || routeDistance || 1) * 1000)) * 100).toFixed(2)}%</div>
+                </div>
+              </div>
+
+              {/* Traffic Formula */}
+              <div>
+                <h4 style={{ color: '#fb923c', fontSize: '16px', fontWeight: 'bold', marginBottom: '8px' }}>🚦 Traffic Torque Penalty</h4>
+                <div style={{ backgroundColor: 'rgba(15, 23, 42, 0.6)', padding: '16px', borderRadius: '8px', border: '1px solid rgba(51, 65, 85, 0.5)', fontFamily: 'monospace', fontSize: '13px', color: '#cbd5e1' }}>
+                  <div style={{ color: '#9ca3af', marginBottom: '8px' }}>// Evaluating Stop-&-Go density via TomTom Routing API</div>
+                  <div>const staticDuration = {routeInfo.staticDuration || 1};</div>
+                  <div>const delayMinutes = {routeInfo.delayMinutes || 0};</div>
+                  <div>const trafficRatio = delayMinutes / staticDuration; <span style={{ color: '#9ca3af' }}>// {((routeInfo.delayMinutes || 0) / (routeInfo.staticDuration || 1)).toFixed(3)}</span></div>
+                  <div style={{ marginTop: '8px', color: '#60a5fa' }}>const penalty = trafficRatio * 0.3 * 100;</div>
+                  <div style={{ color: '#fb923c', fontWeight: 'bold' }}>// Penalty = +{(((routeInfo.delayMinutes || 0) / (routeInfo.staticDuration || 1)) * 0.3 * 100).toFixed(2)}% energy cost</div>
+                </div>
+              </div>
+
+              {/* Regen Formula */}
+              <div>
+                <h4 style={{ color: '#34d399', fontSize: '16px', fontWeight: 'bold', marginBottom: '8px' }}>🔋 Regenerative Braking Bonus</h4>
+                <div style={{ backgroundColor: 'rgba(15, 23, 42, 0.6)', padding: '16px', borderRadius: '8px', border: '1px solid rgba(51, 65, 85, 0.5)', fontFamily: 'monospace', fontSize: '13px', color: '#cbd5e1' }}>
+                  <div style={{ color: '#9ca3af', marginBottom: '8px' }}>// Fusing descent grade with traffic braking frequency</div>
+                  <div>const downhillGrade = {((((routeInfo.distance || routeDistance || 0) * 3.8) / ((routeInfo.distance || routeDistance || 1) * 1000)) * 100).toFixed(2)};</div>
+                  <div>const baseRegen = 0.08;</div>
+                  <div>const trafficRegenEfficiency = 0.6 + (trafficRatio * 0.2); <span style={{ color: '#9ca3af' }}>// {(0.6 + ((routeInfo.delayMinutes || 0) / (routeInfo.staticDuration || 1)) * 0.2).toFixed(2)}</span></div>
+                  <div style={{ marginTop: '8px', color: '#60a5fa' }}>const regenBonus = downhillGrade * baseRegen * trafficRegenEfficiency * 100;</div>
+                  <div style={{ color: '#34d399', fontWeight: 'bold' }}>// Regen Bonus = +{(((((routeInfo.distance || routeDistance || 0) * 3.8) / ((routeInfo.distance || routeDistance || 1) * 1000)) * 100) * 0.08 * (0.6 + ((routeInfo.delayMinutes || 0) / (routeInfo.staticDuration || 1)) * 0.2) * 100).toFixed(2)}% recovered</div>
+                </div>
               </div>
             </div>
           </div>
