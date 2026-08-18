@@ -1402,7 +1402,6 @@ export default function RightMapPanel({
             </span>
           </div>
         </div>
-        </div>
       </div>
 
       {routeInfo && (
