@@ -247,6 +247,23 @@ export default function RightMapPanel({
       });
 
     const fallbackGeocode = async (query) => {
+      const demoLocations = {
+        'dehradun': { lat: 30.3165, lng: 78.0322 },
+        'mussoorie': { lat: 30.4598, lng: 78.0664 },
+        'shimla': { lat: 31.1048, lng: 77.1734 },
+        'kufri': { lat: 31.1011, lng: 77.2666 },
+        'siliguri': { lat: 26.7271, lng: 88.3953 },
+        'darjeeling': { lat: 27.0360, lng: 88.2627 },
+        'delhi': { lat: 28.6139, lng: 77.2090 },
+        'new delhi': { lat: 28.6139, lng: 77.2090 },
+        'noida': { lat: 28.5355, lng: 77.3910 }
+      };
+
+      const normalized = query.toLowerCase().trim();
+      if (demoLocations[normalized]) {
+        return demoLocations[normalized];
+      }
+
       const response = await fetch(
         `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&countrycodes=in&q=${encodeURIComponent(query)}`,
         {
