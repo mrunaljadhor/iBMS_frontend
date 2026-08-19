@@ -447,10 +447,10 @@ export default function ProfessionalDashboard() {
 
 
 
-        {/* Main Dashboard - Split Screen (50/50) */}
+        {/* Main Dashboard - Split Screen */}
         <div style={{
           display: 'grid',
-          gridTemplateColumns: '1fr 1fr',
+          gridTemplateColumns: userRole !== 'analyst' ? '3.5fr 6.5fr' : '1fr 1fr',
           gap: '22px',
           minHeight: 'calc(100vh - 240px)'
         }}>
