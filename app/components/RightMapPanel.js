@@ -1202,7 +1202,7 @@ export default function RightMapPanel({
         border: '1px solid rgba(148, 163, 184, 0.22)',
         borderRadius: '12px',
         overflow: 'hidden',
-        height: '350px',
+        height: '500px',
         width: '100%',
         boxShadow: '0 10px 30px rgba(0, 0, 0, 0.45)',
         backdropFilter: 'blur(16px)'
