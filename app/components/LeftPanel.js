@@ -762,8 +762,7 @@ export default function LeftPanel({ userRole, batteryData, drivingMode, setDrivi
               </div>
             </div>
           </div>
-
-
+        </>
       )}
     </div>
   );
