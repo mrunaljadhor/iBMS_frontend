@@ -282,6 +282,10 @@ export default function AdvancedIntelligenceSuite({
     }
   };
 
+  const displayRul = twinDisplay.curve?.[twinDisplay.curve.length - 1]?.projectedRul ?? projectedRul;
+  const displayDte = twinDisplay.projected_dte ?? projectedDte;
+  const twinCurve = twinDisplay.curve || twinData;
+
   useEffect(() => {
     let cancelled = false;
 
@@ -610,20 +614,20 @@ export default function AdvancedIntelligenceSuite({
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '10px', marginBottom: '12px' }}>
             <div style={miniCard}>
               <p style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Projected RUL</p>
-              <p style={{ color: '#f8fafc', fontSize: '18px', fontWeight: 700 }}>{projectedRul.toFixed(1)} yrs</p>
+              <p style={{ color: '#f8fafc', fontSize: '18px', fontWeight: 700 }}>{displayRul.toFixed(1)} yrs</p>
             </div>
             <div style={miniCard}>
               <p style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Projected DTE</p>
-              <p style={{ color: '#f8fafc', fontSize: '18px', fontWeight: 700 }}>{projectedDte} km</p>
+              <p style={{ color: '#f8fafc', fontSize: '18px', fontWeight: 700 }}>{displayDte} km</p>
             </div>
           </div>
 
-          <div style={{ width: '100%', height: '220px', marginBottom: '10px' }}>
-            <ResponsiveContainer>
+          <div style={{ background: 'rgba(15, 23, 42, 0.4)', borderRadius: '12px', padding: '10px' }}>
+            <ResponsiveContainer width="100%" height={160}>
               <LineChart data={twinCurve}>
                 <CartesianGrid stroke="rgba(148, 163, 184, 0.18)" strokeDasharray="3 3" />
                 <XAxis dataKey="day" stroke="#94a3b8" fontSize={11} />
-                <YAxis domain={[0, 100]} stroke="#94a3b8" fontSize={11} />
+                <YAxis domain={['dataMin - 1', 'dataMax + 1']} stroke="#94a3b8" fontSize={11} />
                 <Tooltip
                   contentStyle={{ background: '#020617', border: '1px solid rgba(148, 163, 184, 0.25)', borderRadius: '10px', color: '#e2e8f0' }}
                 />
