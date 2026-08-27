@@ -193,6 +193,7 @@ export default function AdvancedIntelligenceSuite({
   const [avgSpeedKmh, setAvgSpeedKmh] = useState(60);
   const [accelAggressionPct, setAccelAggressionPct] = useState(10);
   const [brakingAggressionPct, setBrakingAggressionPct] = useState(10);
+  const [twinDistance, setTwinDistance] = useState(routeDistance || 25);
   const [remoteAnalytics, setRemoteAnalytics] = useState({ whisperer: null, xai: null, federated: null, twin: null });
 
   const liveTemperature = Number(batteryData?.Max_Temp_C || batteryData?.temperature || 25);
@@ -338,7 +339,13 @@ export default function AdvancedIntelligenceSuite({
     return () => {
       cancelled = true;
     };
-  }, [batteryData, baseSoH, cycleStressPct, datasetProfile, edgeClients, federatedRound, liveTemperature, loadIncreasePct, socSlider, ambientTempDeltaC, avgSpeedKmh, accelAggressionPct, brakingAggressionPct]);
+  }, [batteryData, baseSoH, cycleStressPct, datasetProfile, edgeClients, federatedRound, liveTemperature, loadIncreasePct, socSlider, ambientTempDeltaC, avgSpeedKmh, accelAggressionPct, brakingAggressionPct, twinDistance]);
+
+  useEffect(() => {
+    if (routeDistance) {
+      setTwinDistance(routeDistance);
+    }
+  }, [routeDistance]);
 
   const handleSend = async (nextQuestion) => {
     const trimmed = String(nextQuestion || question).trim();
@@ -611,6 +618,10 @@ export default function AdvancedIntelligenceSuite({
               <label style={{ display: 'block', marginBottom: '6px', color: '#cbd5e1', fontSize: '12px' }}>Braking Aggression (Regen): {brakingAggressionPct}%</label>
               <input type="range" min="0" max="100" value={brakingAggressionPct} onChange={(event) => setBrakingAggressionPct(Number(event.target.value))} style={{ width: '100%' }} />
             </div>
+            <div style={miniCard}>
+              <label style={{ display: 'block', marginBottom: '6px', color: '#cbd5e1', fontSize: '12px' }}>Route Distance: {twinDistance} km</label>
+              <input type="range" min="1" max="500" value={twinDistance} onChange={(event) => setTwinDistance(Number(event.target.value))} style={{ width: '100%' }} />
+            </div>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '10px', marginBottom: '12px' }}>
@@ -624,7 +635,7 @@ export default function AdvancedIntelligenceSuite({
             </div>
             <div style={miniCard}>
               <p style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Distance</p>
-              <p style={{ color: '#f8fafc', fontSize: '18px', fontWeight: 700 }}>{Number(routeDistance || 0)} km</p>
+              <p style={{ color: '#f8fafc', fontSize: '18px', fontWeight: 700 }}>{twinDistance} km</p>
             </div>
           </div>
 
@@ -644,7 +655,7 @@ export default function AdvancedIntelligenceSuite({
           </div>
 
             <p style={{ color: '#cbd5e1', fontSize: '12px' }}>
-              Scenario change is being evaluated against the live pack context in {drivingMode} mode with {Number(routeDistance || 0)} km route pressure and {Number(calculateDTE?.() || 0)} km available DTE.
+              Scenario change is being evaluated against the live pack context in {drivingMode} mode with {twinDistance} km route pressure and {Number(calculateDTE?.() || 0)} km available DTE.
             </p>
           </div>
         )}
