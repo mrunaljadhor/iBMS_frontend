@@ -358,6 +358,7 @@ function localDigitalTwin(body = {}) {
   const cycleStressPct = Number(body.cycleStressPct ?? 18);
   const avgSpeedKmh = Number(body.avgSpeedKmh ?? 60);
   const accelAggressionPct = Number(body.accelAggressionPct ?? 10);
+  const brakingAggressionPct = Number(body.brakingAggressionPct ?? 10);
   const days = Number(body.days ?? 7);
   const curve = [];
 
@@ -366,7 +367,8 @@ function localDigitalTwin(body = {}) {
   const loadAccel = (loadIncreasePct / 10) * 0.02;
   const cycleAccel = (cycleStressPct / 10) * 0.008;
   const accelAccel = (accelAggressionPct / 10) * 0.025;
-  const stressMultiplier = 1 + tempAccel + loadAccel + cycleAccel + accelAccel;
+  const brakingStress = (brakingAggressionPct / 10) * 0.015; // aggressive braking increases stress slightly
+  const stressMultiplier = 1 + tempAccel + loadAccel + cycleAccel + accelAccel + brakingStress;
   const scenarioDegradationRate = baseDegradationRate * stressMultiplier;
 
   for (let day = 0; day <= days; day += 1) {
@@ -388,8 +390,9 @@ function localDigitalTwin(body = {}) {
   
   const speedFactor = Math.max(0.5, (avgSpeedKmh / 60.0) ** 2);
   const accelFactor = 1.0 + (accelAggressionPct / 100.0) * 0.5;
+  const regenBonus = 1.0 - (brakingAggressionPct / 100.0) * 0.2; // aggressive braking increases regen, reducing consumption
   const nominalConsumption = 150 * (1 + loadIncreasePct / 100.0);
-  const scenarioConsumption = 150 * speedFactor * accelFactor * (1 + loadIncreasePct / 100.0);
+  const scenarioConsumption = 150 * speedFactor * accelFactor * regenBonus * (1 + loadIncreasePct / 100.0);
   
   const scenarioDte = (finalScenarioSoh / 100) * BATTERY.nominalVoltageV * BATTERY.nominalCapacityAh / scenarioConsumption;
   const baselineDte = (baseSoh / 100) * BATTERY.nominalVoltageV * BATTERY.nominalCapacityAh / nominalConsumption;
@@ -409,6 +412,7 @@ function localDigitalTwin(body = {}) {
       cycleStressPct,
       avgSpeedKmh,
       accelAggressionPct,
+      brakingAggressionPct,
       stressMultiplier: Number(stressMultiplier.toFixed(3)),
       degradationRateBaseline: Number(baseDegradationRate.toFixed(3)),
       degradationRateScenario: Number(scenarioDegradationRate.toFixed(3)),

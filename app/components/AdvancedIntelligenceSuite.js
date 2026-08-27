@@ -192,6 +192,7 @@ export default function AdvancedIntelligenceSuite({
   const [cycleStressPct, setCycleStressPct] = useState(18);
   const [avgSpeedKmh, setAvgSpeedKmh] = useState(60);
   const [accelAggressionPct, setAccelAggressionPct] = useState(10);
+  const [brakingAggressionPct, setBrakingAggressionPct] = useState(10);
   const [remoteAnalytics, setRemoteAnalytics] = useState({ whisperer: null, xai: null, federated: null, twin: null });
 
   const liveTemperature = Number(batteryData?.Max_Temp_C || batteryData?.temperature || 25);
@@ -213,6 +214,7 @@ export default function AdvancedIntelligenceSuite({
     cycleStressPct,
     avgSpeedKmh,
     accelAggressionPct,
+    brakingAggressionPct,
     horizonDays: 7
   });
 
@@ -275,7 +277,8 @@ export default function AdvancedIntelligenceSuite({
       ambientTempDeltaC,
       cycleStressPct,
       avgSpeedKmh,
-      accelAggressionPct
+      accelAggressionPct,
+      brakingAggressionPct
     }
   };
 
@@ -292,11 +295,11 @@ export default function AdvancedIntelligenceSuite({
             cycleCount: Number(batteryData?.Cycle_Count || 0),
             soc: socSlider,
             datasetProfile
-          }),
+          }).catch(e => { console.error('XAI API error:', e); return null; }),
           postJson('/api/intelligence/federated', {
             rounds: federatedRound,
             edgeNodes: edgeClients
-          }),
+          }).catch(e => { console.error('Federated API error:', e); return null; }),
           postJson('/api/intelligence/digital-twin', {
             baseSoh: baseSoH,
             loadIncreasePct,
@@ -304,16 +307,17 @@ export default function AdvancedIntelligenceSuite({
             cycleStressPct,
             avgSpeedKmh,
             accelAggressionPct,
+            brakingAggressionPct,
             days: 7
-          })
+          }).catch(e => { console.error('Twin API error:', e); return null; })
         ]);
 
         if (!cancelled) {
           setRemoteAnalytics((current) => ({
             ...current,
-            xai: xaiResult,
-            federated: federatedResult,
-            twin: twinResult
+            xai: xaiResult || current.xai,
+            federated: federatedResult || current.federated,
+            twin: twinResult || null
           }));
         }
       } catch (error) {
@@ -326,7 +330,7 @@ export default function AdvancedIntelligenceSuite({
     return () => {
       cancelled = true;
     };
-  }, [batteryData, baseSoH, cycleStressPct, datasetProfile, edgeClients, federatedRound, liveTemperature, loadIncreasePct, socSlider, ambientTempDeltaC, avgSpeedKmh, accelAggressionPct]);
+  }, [batteryData, baseSoH, cycleStressPct, datasetProfile, edgeClients, federatedRound, liveTemperature, loadIncreasePct, socSlider, ambientTempDeltaC, avgSpeedKmh, accelAggressionPct, brakingAggressionPct]);
 
   const handleSend = async (nextQuestion) => {
     const trimmed = String(nextQuestion || question).trim();
@@ -596,6 +600,10 @@ export default function AdvancedIntelligenceSuite({
             <div style={miniCard}>
               <label style={{ display: 'block', marginBottom: '6px', color: '#cbd5e1', fontSize: '12px' }}>Acceleration Aggression: {accelAggressionPct}%</label>
               <input type="range" min="0" max="100" value={accelAggressionPct} onChange={(event) => setAccelAggressionPct(Number(event.target.value))} style={{ width: '100%' }} />
+            </div>
+            <div style={miniCard}>
+              <label style={{ display: 'block', marginBottom: '6px', color: '#cbd5e1', fontSize: '12px' }}>Braking Aggression (Regen): {brakingAggressionPct}%</label>
+              <input type="range" min="0" max="100" value={brakingAggressionPct} onChange={(event) => setBrakingAggressionPct(Number(event.target.value))} style={{ width: '100%' }} />
             </div>
           </div>
 
