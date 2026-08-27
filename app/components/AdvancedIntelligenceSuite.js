@@ -395,8 +395,6 @@ export default function AdvancedIntelligenceSuite({
     }
   };
 
-  const twinCurve = twinDisplay.curve || twinData;
-
   return (
     <section style={{ marginTop: '22px' }} className="slide-up">
       <div style={{ marginBottom: '16px' }}>
