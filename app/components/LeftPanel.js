@@ -481,6 +481,7 @@ export default function LeftPanel({ userRole, batteryData, drivingMode, setDrivi
       </div>
 
       {/* DTE Display & Charging Recommendation */}
+      {userRole !== 'analyst' && (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
           
           {/* DTE Display */}
@@ -543,6 +544,7 @@ export default function LeftPanel({ userRole, batteryData, drivingMode, setDrivi
             </div>
           </div>
         </div>
+      )}
 
       {userRole === 'analyst' && (
         <>
