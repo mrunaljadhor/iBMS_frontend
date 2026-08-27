@@ -227,6 +227,7 @@ export default function ProfessionalDashboard() {
         return () => clearTimeout(timer);
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [socSlider, drivingMode, operatingProfile, routeDistance]);
 
   // Route distance is now traffic-aware and updated by RightMapPanel.
