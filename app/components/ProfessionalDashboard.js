@@ -55,29 +55,12 @@ const VEHICLE_OPTIONS = [
   }
 ];
 
-const OPERATING_PROFILES = [
-  {
-    id: 'normal',
-    label: 'Normal',
-    description: 'Balanced energy usage and responsiveness'
-  },
-  {
-    id: 'range',
-    label: 'Range Priority',
-    description: 'Conservative usage to maximize distance'
-  },
-  {
-    id: 'performance',
-    label: 'Performance',
-    description: 'Higher responsiveness with increased energy draw'
-  }
+const DRIVING_LEVELS = [
+  { id: 'level_1', label: 'Level 1: Optimal', description: 'Normal Braking, Normal Acceleration', factor: 1.0 },
+  { id: 'level_2', label: 'Level 2: Moderate', description: 'Aggressive Braking, Normal Acceleration', factor: 1.1 },
+  { id: 'level_3', label: 'Level 3: High Drain', description: 'Normal Braking, Aggressive Acceleration', factor: 1.25 },
+  { id: 'level_4', label: 'Level 4: Extreme', description: 'Aggressive Braking, Aggressive Acceleration', factor: 1.4 }
 ];
-
-const OPERATING_PROFILE_FACTORS = {
-  normal: 1,
-  range: 0.9,
-  performance: 1.1
-};
 
 const TRINITY_FULL_RANGE_KM = {
   ECO: 76,
@@ -115,7 +98,8 @@ export default function ProfessionalDashboard() {
   const [selectedVehicle, setSelectedVehicle] = useState(DEFAULT_VEHICLE_ID);
   const [activeDatasetProfile, setActiveDatasetProfile] = useState(defaultVehicleProfile);
   const [datasetMode, setDatasetMode] = useState('default');
-  const [operatingProfile, setOperatingProfile] = useState('normal');
+  const [operatingProfile, setOperatingProfile] = useState('level_1');
+  const [amsaAlert, setAmsaAlert] = useState(null);
   const [datasetMessage, setDatasetMessage] = useState(
     `Using normal configuration for ${getVehicleOption(DEFAULT_VEHICLE_ID).label} with dataset profile: ${defaultVehicleProfile.datasetName}`
   );
@@ -218,19 +202,32 @@ export default function ProfessionalDashboard() {
     const safeSoc = Math.max(0, Math.min(100, Number(socPercent) || 0));
     const normalizedMode = String(mode || 'ECO').toUpperCase();
     const baseFullRange = TRINITY_FULL_RANGE_KM[normalizedMode] || TRINITY_FULL_RANGE_KM.ECO;
-    const profileFactor = OPERATING_PROFILE_FACTORS[profile] || 1;
+    const profileFactor = DRIVING_LEVELS.find(l => l.id === profile)?.factor || 1.0;
     return Math.round((safeSoc / 100) * (baseFullRange / profileFactor));
   };
 
   const calculateDTE = () => estimateRangeAtSoc(socSlider);
 
-  // AMAS: SPORT is allowed down to 40% SOC.
-  // Below 40%, SPORT is blocked and system falls back to ECO.
   useEffect(() => {
+    // Basic SOC lock
     if (socSlider < 40 && drivingMode === 'SPORT') {
       setDrivingMode('ECO');
     }
-  }, [socSlider, drivingMode]);
+
+    // AMSA 4-Level Logic: Prevent selection of extreme levels if destination is unreachable
+    const currentDte = estimateRangeAtSoc(socSlider, drivingMode, operatingProfile);
+    if (currentDte < routeDistance && operatingProfile !== 'level_1') {
+      const optimalDte = estimateRangeAtSoc(socSlider, drivingMode, 'level_1');
+      if (optimalDte >= routeDistance) {
+        setOperatingProfile('level_1');
+        setAmsaAlert(`AMSA ECO-LOCK ENGAGED: Destination unreachable on current level. Forcing Level 1 to ensure safe arrival.`);
+        
+        // Auto-hide alert after 8 seconds
+        const timer = setTimeout(() => setAmsaAlert(null), 8000);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [socSlider, drivingMode, operatingProfile, routeDistance]);
 
   // Route distance is now traffic-aware and updated by RightMapPanel.
   // Keep the shared state here so other panels can consume the adjusted distance.
@@ -242,6 +239,23 @@ export default function ProfessionalDashboard() {
       padding: '28px'
     }}>
       <div style={{ maxWidth: '1600px', margin: '0 auto' }}>
+        {amsaAlert && (
+          <div style={{
+            background: 'rgba(239, 68, 68, 0.1)',
+            border: '1px solid rgba(239, 68, 68, 0.5)',
+            color: '#f87171',
+            padding: '16px',
+            borderRadius: '12px',
+            marginBottom: '20px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            fontWeight: 500
+          }}>
+            <svg style={{ width: '24px', height: '24px' }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+            {amsaAlert}
+          </div>
+        )}
         {/* Premium Header */}
         <div style={{ marginBottom: '36px' }} className="slide-up">
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
@@ -367,7 +381,7 @@ export default function ProfessionalDashboard() {
 
             <div style={{ background: 'rgba(15, 23, 42, 0.5)', border: '1px solid rgba(71, 85, 105, 0.5)', borderRadius: '10px', padding: '12px' }}>
               <label style={{ display: 'block', fontSize: '11px', letterSpacing: '0.08em', textTransform: 'uppercase', color: '#94a3b8', marginBottom: '8px' }}>
-                Operating Profile
+                Driving Profile Level
               </label>
               <select
                 value={operatingProfile}
@@ -382,12 +396,12 @@ export default function ProfessionalDashboard() {
                   fontSize: '13px'
                 }}
               >
-                {OPERATING_PROFILES.map((profile) => (
+                {DRIVING_LEVELS.map((profile) => (
                   <option key={profile.id} value={profile.id}>{profile.label}</option>
                 ))}
               </select>
               <p style={{ marginTop: '8px', fontSize: '12px', color: '#9ca3af' }}>
-                {OPERATING_PROFILES.find((profile) => profile.id === operatingProfile)?.description}
+                {DRIVING_LEVELS.find((profile) => profile.id === operatingProfile)?.description}
               </p>
             </div>
 
