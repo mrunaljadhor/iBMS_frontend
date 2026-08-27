@@ -225,11 +225,12 @@ export default function OverviewAnalyticsPanel({
 
   const kpiData = [
     { label: 'SOC', value: `${socSlider.toFixed(1)}%`, accent: '#22c55e' },
-    { label: 'DTE', value: `${dte} km`, accent: '#38bdf8' },
     ...(userRole === 'analyst' ? [
       { label: 'SOH', value: `${healthMetrics.soh.toFixed(1)}%`, accent: '#a78bfa' },
       { label: 'RUL', value: `${healthMetrics.rulYears.toFixed(1)} yrs`, accent: '#f59e0b' }
-    ] : []),
+    ] : [
+      { label: 'DTE', value: `${dte} km`, accent: '#38bdf8' }
+    ]),
     { label: 'Route', value: `${routeDistance || 0} km`, accent: '#f43f5e' },
     {
       label: 'Mode',
@@ -353,22 +354,7 @@ export default function OverviewAnalyticsPanel({
             </div>
           </div>
 
-          <div style={chartCardStyle}>
-            <h4 style={{ fontSize: '14px', color: '#cbd5e1', marginBottom: '12px', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
-              Range Projection by SOC
-            </h4>
-            <div style={{ width: '100%', height: '200px' }}>
-              <ResponsiveContainer>
-                <LineChart data={projectionData} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(148, 163, 184, 0.18)" />
-                  <XAxis dataKey="soc" tick={{ fill: '#94a3b8', fontSize: 11 }} unit="%" />
-                  <YAxis tick={{ fill: '#94a3b8', fontSize: 11 }} unit=" km" />
-                  <Tooltip contentStyle={tooltipStyle} />
-                  <Line type="monotone" dataKey="range" stroke="#22d3ee" strokeWidth={3} dot={{ r: 3, fill: '#22d3ee' }} />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
+
 
           <div style={chartCardStyle}>
             <h4 style={{ fontSize: '14px', color: '#cbd5e1', marginBottom: '12px', letterSpacing: '0.04em', textTransform: 'uppercase' }}>

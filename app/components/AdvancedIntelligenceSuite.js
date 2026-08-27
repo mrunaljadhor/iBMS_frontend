@@ -143,9 +143,9 @@ function buildXaiBreakdown(healthMetrics, batteryData) {
   };
 }
 
-function buildDigitalTwinCurve({ baseSoh, loadIncreasePct, ambientTempDeltaC, cycleStressPct, horizonDays }) {
+function buildDigitalTwinCurve({ baseSoh, loadIncreasePct, ambientTempDeltaC, cycleStressPct, avgSpeedKmh, accelAggressionPct, brakingAggressionPct, horizonDays }) {
   const baseDailyDrop = clamp((100 - baseSoh) * 0.0085, 0.03, 0.32);
-  const scenarioMultiplier = 1 + (loadIncreasePct * 0.018) + (ambientTempDeltaC * 0.032) + (cycleStressPct * 0.012);
+  const scenarioMultiplier = 1 + (loadIncreasePct * 0.018) + (ambientTempDeltaC * 0.032) + (cycleStressPct * 0.012) + (accelAggressionPct * 0.0025) + (brakingAggressionPct * 0.0015);
 
   return Array.from({ length: horizonDays + 1 }, (_, day) => {
     const baseline = clamp(baseSoh - (baseDailyDrop * day), 0, 100);
@@ -218,9 +218,13 @@ export default function AdvancedIntelligenceSuite({
     horizonDays: 7
   });
 
-  const scenarioDailyDrop = clamp((100 - baseSoH) * 0.0085 * (1 + loadIncreasePct * 0.018 + ambientTempDeltaC * 0.032 + cycleStressPct * 0.012), 0.05, 0.75);
+  const scenarioDailyDrop = clamp((100 - baseSoH) * 0.0085 * (1 + loadIncreasePct * 0.018 + ambientTempDeltaC * 0.032 + cycleStressPct * 0.012 + accelAggressionPct * 0.0025 + brakingAggressionPct * 0.0015), 0.05, 0.75);
   const projectedRul = clamp((baseSoH - healthMetrics.eolThreshold) / (scenarioDailyDrop * 365), 0, 15);
-  const projectedDte = typeof calculateDTE === 'function' ? Math.max(0, Math.round(calculateDTE() * (1 - loadIncreasePct * 0.01) * (1 - ambientTempDeltaC * 0.004))) : 0;
+  const speedFactor = Math.max(0.5, (avgSpeedKmh / 60.0) ** 2);
+  const accelFactor = 1.0 + (accelAggressionPct / 100.0) * 0.5;
+  const regenBonus = 1.0 - (brakingAggressionPct / 100.0) * 0.2;
+  const consumptionPenalty = speedFactor * accelFactor * regenBonus * (1 + loadIncreasePct * 0.01) * (1 + ambientTempDeltaC * 0.004);
+  const projectedDte = typeof calculateDTE === 'function' ? Math.max(0, Math.round(calculateDTE() / consumptionPenalty)) : 0;
 
 
   const federatedNodes = Array.from({ length: edgeClients }, (_, index) => {
@@ -611,7 +615,7 @@ export default function AdvancedIntelligenceSuite({
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '10px', marginBottom: '12px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '10px', marginBottom: '12px' }}>
             <div style={miniCard}>
               <p style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Projected RUL</p>
               <p style={{ color: '#f8fafc', fontSize: '18px', fontWeight: 700 }}>{displayRul.toFixed(1)} yrs</p>
@@ -619,6 +623,10 @@ export default function AdvancedIntelligenceSuite({
             <div style={miniCard}>
               <p style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Projected DTE</p>
               <p style={{ color: '#f8fafc', fontSize: '18px', fontWeight: 700 }}>{displayDte} km</p>
+            </div>
+            <div style={miniCard}>
+              <p style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Distance</p>
+              <p style={{ color: '#f8fafc', fontSize: '18px', fontWeight: 700 }}>{Number(routeDistance || 0)} km</p>
             </div>
           </div>
 
