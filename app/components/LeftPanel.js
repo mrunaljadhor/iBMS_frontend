@@ -4,7 +4,14 @@ import { useState } from 'react';
 import { calculateBatteryHealthMetrics } from '../utils/batteryHealth';
 import { TRINITY_DATASET_PROFILE } from '../utils/trinityDatasetProfile';
 
-export default function LeftPanel({ userRole, batteryData, drivingMode, setDrivingMode, socSlider, setSocSlider, calculateDTE, routeDistance, datasetProfile, routeInfo }) {
+const DRIVING_LEVELS = [
+  { id: 'level_1', label: 'L1: Optimal', description: 'Normal Braking, Normal Accel' },
+  { id: 'level_2', label: 'L2: Moderate', description: 'Aggressive Braking, Normal Accel' },
+  { id: 'level_3', label: 'L3: High Drain', description: 'Normal Braking, Aggressive Accel' },
+  { id: 'level_4', label: 'L4: Extreme', description: 'Aggressive Braking, Aggressive Accel' }
+];
+
+export default function LeftPanel({ userRole, batteryData, drivingMode, setDrivingMode, socSlider, setSocSlider, calculateDTE, routeDistance, datasetProfile, routeInfo, operatingProfile, setOperatingProfile }) {
   const dte = calculateDTE();
   const AMAS_SPORT_LOCK_SOC_THRESHOLD = 40;
   const isSportLocked = socSlider < AMAS_SPORT_LOCK_SOC_THRESHOLD;
@@ -341,9 +348,8 @@ export default function LeftPanel({ userRole, batteryData, drivingMode, setDrivi
               <span style={{ fontSize: '14px', fontWeight: '600', color: '#d1d5db' }}>Current SOC</span>
               <span style={{ fontSize: '28px', fontWeight: 'bold', color: getSOCColor(socSlider) }}>{socSlider}%</span>
             </div>
-
             {/* Quick Preset Buttons */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '8px' }}>
               {[0, 25, 50, 75, 100].map(value => (
                 <button
                   key={value}
@@ -363,6 +369,37 @@ export default function LeftPanel({ userRole, batteryData, drivingMode, setDrivi
                   {value}%
                 </button>
               ))}
+            </div>
+
+            {/* Driving Profile Levels */}
+            <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <label style={{ fontSize: '13px', fontWeight: '600', color: '#d1d5db' }}>Driving Profile Level:</label>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
+                {DRIVING_LEVELS.map(level => (
+                  <button
+                    key={level.id}
+                    onClick={() => setOperatingProfile && setOperatingProfile(level.id)}
+                    style={{
+                      padding: '12px 8px',
+                      borderRadius: '8px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '4px',
+                      border: operatingProfile === level.id ? '2px solid #3b82f6' : '1px solid rgba(71, 85, 105, 0.5)',
+                      background: operatingProfile === level.id ? 'linear-gradient(135deg, rgba(37, 99, 235, 0.2) 0%, rgba(59, 130, 246, 0.1) 100%)' : 'rgba(51, 65, 85, 0.4)',
+                      color: operatingProfile === level.id ? '#60a5fa' : '#94a3b8',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease',
+                      textAlign: 'center'
+                    }}
+                  >
+                    <span style={{ fontSize: '13px', fontWeight: 'bold' }}>{level.label}</span>
+                    <span style={{ fontSize: '10px', opacity: 0.8, lineHeight: 1.2 }}>{level.description}</span>
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         </div>

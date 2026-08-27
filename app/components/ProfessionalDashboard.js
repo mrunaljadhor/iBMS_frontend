@@ -380,31 +380,7 @@ export default function ProfessionalDashboard() {
               </p>
             </div>
 
-            <div style={{ background: 'rgba(15, 23, 42, 0.5)', border: '1px solid rgba(71, 85, 105, 0.5)', borderRadius: '10px', padding: '12px' }}>
-              <label style={{ display: 'block', fontSize: '11px', letterSpacing: '0.08em', textTransform: 'uppercase', color: '#94a3b8', marginBottom: '8px' }}>
-                Driving Profile Level
-              </label>
-              <select
-                value={operatingProfile}
-                onChange={(event) => setOperatingProfile(event.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '10px',
-                  background: 'rgba(51, 65, 85, 0.6)',
-                  border: '1px solid rgba(71, 85, 105, 0.5)',
-                  borderRadius: '6px',
-                  color: '#f8fafc',
-                  fontSize: '13px'
-                }}
-              >
-                {DRIVING_LEVELS.map((profile) => (
-                  <option key={profile.id} value={profile.id}>{profile.label}</option>
-                ))}
-              </select>
-              <p style={{ marginTop: '8px', fontSize: '12px', color: '#9ca3af' }}>
-                {DRIVING_LEVELS.find((profile) => profile.id === operatingProfile)?.description}
-              </p>
-            </div>
+
 
             <div style={{ background: 'rgba(15, 23, 42, 0.5)', border: '1px solid rgba(71, 85, 105, 0.5)', borderRadius: '10px', padding: '12px' }}>
               <label style={{ display: 'block', fontSize: '11px', letterSpacing: '0.08em', textTransform: 'uppercase', color: '#94a3b8', marginBottom: '8px' }}>
@@ -482,6 +458,8 @@ export default function ProfessionalDashboard() {
               routeDistance={routeDistance}
               datasetProfile={activeDatasetProfile}
               routeInfo={routeInfo}
+              operatingProfile={operatingProfile}
+              setOperatingProfile={setOperatingProfile}
             />
           </div>
 
