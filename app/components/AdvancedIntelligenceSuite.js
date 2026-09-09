@@ -143,13 +143,13 @@ function buildXaiBreakdown(healthMetrics, batteryData) {
   };
 }
 
-function buildDigitalTwinCurve({ baseSoh, loadIncreasePct, ambientTempDeltaC, cycleStressPct, avgSpeedKmh, accelAggressionPct, brakingAggressionPct, horizonDays }) {
+function buildDigitalTwinCurve({ baseSoh, payloadWeightKg, ambientTempDeltaC, terrainGradientPct, fastChargeFreqPct, avgSpeedKmh, accelAggressionPct, brakingAggressionPct, horizonDays }) {
   const baseDailyDrop = clamp((100 - baseSoh) * 0.0085, 0.03, 0.32);
-  const scenarioMultiplier = 1 + (loadIncreasePct * 0.018) + (ambientTempDeltaC * 0.032) + (cycleStressPct * 0.012) + (accelAggressionPct * 0.0025) + (brakingAggressionPct * 0.0015);
+  const scenarioMultiplier = 1 + (payloadWeightKg * 0.0008) + (ambientTempDeltaC * 0.032) + (terrainGradientPct * 0.08) + (fastChargeFreqPct * 0.015) + (accelAggressionPct * 0.0025) + (brakingAggressionPct * 0.0015);
 
   return Array.from({ length: horizonDays + 1 }, (_, day) => {
     const baseline = clamp(baseSoh - (baseDailyDrop * day), 0, 100);
-    const scenario = clamp(baseSoh - (baseDailyDrop * scenarioMultiplier * day) - (loadIncreasePct * 0.04) - (ambientTempDeltaC * 0.12), 0, 100);
+    const scenario = clamp(baseSoh - (baseDailyDrop * scenarioMultiplier * day) - (payloadWeightKg * 0.001) - (ambientTempDeltaC * 0.12), 0, 100);
 
     return {
       day,
@@ -187,9 +187,10 @@ export default function AdvancedIntelligenceSuite({
   const [messages, setMessages] = useState([]);
   const [edgeClients, setEdgeClients] = useState(6);
   const [federatedRound, setFederatedRound] = useState(3);
-  const [loadIncreasePct, setLoadIncreasePct] = useState(15);
+  const [payloadWeightKg, setPayloadWeightKg] = useState(0);
   const [ambientTempDeltaC, setAmbientTempDeltaC] = useState(6);
-  const [cycleStressPct, setCycleStressPct] = useState(18);
+  const [terrainGradientPct, setTerrainGradientPct] = useState(0);
+  const [fastChargeFreqPct, setFastChargeFreqPct] = useState(15);
   const [avgSpeedKmh, setAvgSpeedKmh] = useState(60);
   const [accelAggressionPct, setAccelAggressionPct] = useState(10);
   const [brakingAggressionPct, setBrakingAggressionPct] = useState(10);
@@ -210,21 +211,22 @@ export default function AdvancedIntelligenceSuite({
   const baseSoH = Number(healthMetrics?.soh || 0);
   const twinData = buildDigitalTwinCurve({
     baseSoh: baseSoH,
-    loadIncreasePct,
+    payloadWeightKg,
     ambientTempDeltaC,
-    cycleStressPct,
+    terrainGradientPct,
+    fastChargeFreqPct,
     avgSpeedKmh,
     accelAggressionPct,
     brakingAggressionPct,
     horizonDays: 7
   });
 
-  const scenarioDailyDrop = clamp((100 - baseSoH) * 0.0085 * (1 + loadIncreasePct * 0.018 + ambientTempDeltaC * 0.032 + cycleStressPct * 0.012 + accelAggressionPct * 0.0025 + brakingAggressionPct * 0.0015), 0.05, 0.75);
+  const scenarioDailyDrop = clamp((100 - baseSoH) * 0.0085 * (1 + payloadWeightKg * 0.0008 + ambientTempDeltaC * 0.032 + terrainGradientPct * 0.08 + fastChargeFreqPct * 0.015 + accelAggressionPct * 0.0025 + brakingAggressionPct * 0.0015), 0.05, 0.75);
   const projectedRul = clamp((baseSoH - healthMetrics.eolThreshold) / (scenarioDailyDrop * 365), 0, 15);
   const speedFactor = Math.max(0.5, (avgSpeedKmh / 60.0) ** 2);
   const accelFactor = 1.0 + (accelAggressionPct / 100.0) * 0.5;
   const regenBonus = 1.0 - (brakingAggressionPct / 100.0) * 0.2;
-  const consumptionPenalty = speedFactor * accelFactor * regenBonus * (1 + loadIncreasePct * 0.01) * (1 + ambientTempDeltaC * 0.004);
+  const consumptionPenalty = speedFactor * accelFactor * regenBonus * (1 + payloadWeightKg * 0.0005) * (1 + terrainGradientPct * 0.05) * (1 + ambientTempDeltaC * 0.004);
   const projectedDte = typeof calculateDTE === 'function' ? Math.max(0, Math.round(calculateDTE() / consumptionPenalty)) : 0;
 
 
@@ -339,7 +341,7 @@ export default function AdvancedIntelligenceSuite({
     return () => {
       cancelled = true;
     };
-  }, [batteryData, baseSoH, cycleStressPct, datasetProfile, edgeClients, federatedRound, liveTemperature, loadIncreasePct, socSlider, ambientTempDeltaC, avgSpeedKmh, accelAggressionPct, brakingAggressionPct, twinDistance]);
+  }, [batteryData, baseSoH, payloadWeightKg, datasetProfile, edgeClients, federatedRound, liveTemperature, terrainGradientPct, socSlider, fastChargeFreqPct, ambientTempDeltaC, avgSpeedKmh, accelAggressionPct, brakingAggressionPct, twinDistance]);
 
   useEffect(() => {
     if (routeDistance) {
@@ -595,16 +597,20 @@ export default function AdvancedIntelligenceSuite({
 
           <div style={{ display: 'grid', gap: '10px', marginBottom: '12px' }}>
             <div style={miniCard}>
-              <label style={{ display: 'block', marginBottom: '6px', color: '#cbd5e1', fontSize: '12px' }}>Load increase: {loadIncreasePct}%</label>
-              <input type="range" min="0" max="25" value={loadIncreasePct} onChange={(event) => setLoadIncreasePct(Number(event.target.value))} style={{ width: '100%' }} />
+              <label style={{ display: 'block', marginBottom: '6px', color: '#cbd5e1', fontSize: '12px' }}>Payload Weight: {payloadWeightKg} kg</label>
+              <input type="range" min="0" max="1000" step="50" value={payloadWeightKg} onChange={(event) => setPayloadWeightKg(Number(event.target.value))} style={{ width: '100%' }} />
+            </div>
+            <div style={miniCard}>
+              <label style={{ display: 'block', marginBottom: '6px', color: '#cbd5e1', fontSize: '12px' }}>Terrain Gradient (Slope): {terrainGradientPct}%</label>
+              <input type="range" min="-10" max="25" value={terrainGradientPct} onChange={(event) => setTerrainGradientPct(Number(event.target.value))} style={{ width: '100%' }} />
+            </div>
+            <div style={miniCard}>
+              <label style={{ display: 'block', marginBottom: '6px', color: '#cbd5e1', fontSize: '12px' }}>Fast-Charging Frequency: {fastChargeFreqPct}%</label>
+              <input type="range" min="0" max="100" value={fastChargeFreqPct} onChange={(event) => setFastChargeFreqPct(Number(event.target.value))} style={{ width: '100%' }} />
             </div>
             <div style={miniCard}>
               <label style={{ display: 'block', marginBottom: '6px', color: '#cbd5e1', fontSize: '12px' }}>Ambient temperature delta: +{ambientTempDeltaC}°C</label>
               <input type="range" min="0" max="12" value={ambientTempDeltaC} onChange={(event) => setAmbientTempDeltaC(Number(event.target.value))} style={{ width: '100%' }} />
-            </div>
-            <div style={miniCard}>
-              <label style={{ display: 'block', marginBottom: '6px', color: '#cbd5e1', fontSize: '12px' }}>Cycle aggression: {cycleStressPct}%</label>
-              <input type="range" min="0" max="30" value={cycleStressPct} onChange={(event) => setCycleStressPct(Number(event.target.value))} style={{ width: '100%' }} />
             </div>
             <div style={miniCard}>
               <label style={{ display: 'block', marginBottom: '6px', color: '#cbd5e1', fontSize: '12px' }}>Avg Speed: {avgSpeedKmh} km/h</label>
