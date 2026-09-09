@@ -21,6 +21,7 @@ import { TRINITY_DATASET_PROFILE } from '../utils/trinityDatasetProfile';
 const socColors = ['#22c55e', '#334155'];
 const utilizationColors = ['#38bdf8', '#374151'];
 const stressColors = ['#f97316', '#0ea5e9', '#f43f5e'];
+const cycleColors = ['#a78bfa', '#1e293b'];
 
 const chartCardStyle = {
   background: 'linear-gradient(160deg, rgba(8, 10, 14, 0.96) 0%, rgba(2, 3, 6, 0.96) 100%)',
@@ -223,6 +224,24 @@ export default function OverviewAnalyticsPanel({
     { name: 'Low SOC', value: Number(healthMetrics.lowSocPenalty.toFixed(2)) }
   ];
 
+  const cycleCount = getNumeric(
+    batteryData?.Cycle_Count,
+    batteryData?.cycle_count,
+    activeDatasetProfile.cycleCount,
+    TRINITY_DATASET_PROFILE.cycleCount
+  );
+  const designCycleLife = getNumeric(
+    batteryData?.Design_Cycle_Life,
+    batteryData?.design_cycle_life,
+    activeDatasetProfile.designCycleLife,
+    TRINITY_DATASET_PROFILE.designCycleLife
+  );
+  const cycleUsedPct = designCycleLife > 0 ? Math.min(100, (cycleCount / designCycleLife) * 100) : 0;
+  const cycleUtilizationData = [
+    { name: 'Cycles Used', value: Number(cycleUsedPct.toFixed(1)) },
+    { name: 'Cycles Remaining', value: Number((100 - cycleUsedPct).toFixed(1)) }
+  ];
+
   const kpiData = [
     { label: 'SOC', value: `${socSlider.toFixed(1)}%`, accent: '#22c55e' },
     ...(userRole === 'analyst' ? [
@@ -298,13 +317,13 @@ export default function OverviewAnalyticsPanel({
         }}>
           <div style={chartCardStyle}>
             <h4 style={{ fontSize: '14px', color: '#cbd5e1', marginBottom: '12px', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
-              Charge Composition
+              Cycle Utilization
             </h4>
             <div style={{ width: '100%', height: '200px' }}>
               <ResponsiveContainer>
                 <PieChart>
                   <Pie
-                    data={socPieData}
+                    data={cycleUtilizationData}
                     dataKey="value"
                     nameKey="name"
                     cx="50%"
@@ -314,8 +333,8 @@ export default function OverviewAnalyticsPanel({
                     paddingAngle={2}
                     stroke="none"
                   >
-                    {socPieData.map((entry, index) => (
-                      <Cell key={`soc-cell-${entry.name}`} fill={socColors[index % socColors.length]} />
+                    {cycleUtilizationData.map((entry, index) => (
+                      <Cell key={`cycle-cell-${entry.name}`} fill={cycleColors[index % cycleColors.length]} />
                     ))}
                   </Pie>
                   <Tooltip content={renderPieTooltip} wrapperStyle={{ outline: 'none' }} />
