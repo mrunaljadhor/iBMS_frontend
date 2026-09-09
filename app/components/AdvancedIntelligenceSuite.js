@@ -2,7 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import {
+  Bar,
+  BarChart,
   CartesianGrid,
+  Cell,
   Line,
   LineChart,
   ResponsiveContainer,
@@ -228,6 +231,33 @@ export default function AdvancedIntelligenceSuite({
   const regenBonus = 1.0 - (brakingAggressionPct / 100.0) * 0.2;
   const consumptionPenalty = speedFactor * accelFactor * regenBonus * (1 + payloadWeightKg * 0.0005) * (1 + terrainGradientPct * 0.05) * (1 + ambientTempDeltaC * 0.004);
   const projectedDte = typeof calculateDTE === 'function' ? Math.max(0, Math.round(calculateDTE() / consumptionPenalty)) : 0;
+
+  let feasibilityStatus = 'SAFE';
+  let feasibilityColor = '#22c55e';
+  let feasibilityMessage = 'Projected DTE comfortably covers route distance.';
+  if (projectedDte < twinDistance) {
+    feasibilityStatus = 'CRITICAL';
+    feasibilityColor = '#ef4444';
+    feasibilityMessage = `FEASIBILITY FAILED: Projected DTE (${projectedDte} km) is less than Route (${twinDistance} km).`;
+  } else if (projectedDte < twinDistance * 1.2) {
+    feasibilityStatus = 'MARGINAL';
+    feasibilityColor = '#f59e0b';
+    feasibilityMessage = `WARNING: Tight margin (${projectedDte - twinDistance} km buffer). High stranding risk.`;
+  }
+
+  const energyPenaltyPct = Math.round((consumptionPenalty - 1) * 100);
+  const baseDte = typeof calculateDTE === 'function' ? calculateDTE() : 0;
+  const terrainImpact = baseDte > 0 ? Math.round(baseDte / (1 + terrainGradientPct * 0.05)) - baseDte : 0;
+  const payloadImpact = baseDte > 0 ? Math.round(baseDte / (1 + payloadWeightKg * 0.0005)) - baseDte : 0;
+  const tempImpact = baseDte > 0 ? Math.round(baseDte / (1 + ambientTempDeltaC * 0.004)) - baseDte : 0;
+  const speedImpact = baseDte > 0 ? Math.round(baseDte / speedFactor) - baseDte : 0;
+  
+  const tornadoData = [
+    { name: 'Terrain', impact: terrainImpact },
+    { name: 'Payload', impact: payloadImpact },
+    { name: 'Speed', impact: speedImpact },
+    { name: 'Ambient Temp', impact: tempImpact }
+  ].sort((a, b) => a.impact - b.impact);
 
 
   const federatedNodes = Array.from({ length: edgeClients }, (_, index) => {
@@ -630,23 +660,64 @@ export default function AdvancedIntelligenceSuite({
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '10px', marginBottom: '12px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: '10px', marginBottom: '16px' }}>
             <div style={miniCard}>
               <p style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Projected RUL</p>
               <p style={{ color: '#f8fafc', fontSize: '18px', fontWeight: 700 }}>{displayRul.toFixed(1)} yrs</p>
             </div>
             <div style={miniCard}>
               <p style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Projected DTE</p>
-              <p style={{ color: '#f8fafc', fontSize: '18px', fontWeight: 700 }}>{displayDte} km</p>
+              <p style={{ color: feasibilityColor, fontSize: '18px', fontWeight: 700 }}>{displayDte} km</p>
             </div>
             <div style={miniCard}>
-              <p style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Distance</p>
+              <p style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Energy Penalty</p>
+              <p style={{ color: energyPenaltyPct > 20 ? '#ef4444' : energyPenaltyPct > 0 ? '#f59e0b' : '#22c55e', fontSize: '18px', fontWeight: 700 }}>
+                {energyPenaltyPct > 0 ? '+' : ''}{energyPenaltyPct}%
+              </p>
+            </div>
+            <div style={miniCard}>
+              <p style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Route Distance</p>
               <p style={{ color: '#f8fafc', fontSize: '18px', fontWeight: 700 }}>{twinDistance} km</p>
             </div>
           </div>
 
-          <div style={{ background: 'rgba(15, 23, 42, 0.4)', borderRadius: '12px', padding: '10px' }}>
-            <ResponsiveContainer width="100%" height={160}>
+          <div style={{
+            background: `rgba(${feasibilityStatus === 'CRITICAL' ? '239, 68, 68' : feasibilityStatus === 'MARGINAL' ? '245, 158, 11' : '34, 197, 94'}, 0.1)`,
+            border: `1px solid ${feasibilityColor}`,
+            padding: '12px 16px',
+            borderRadius: '8px',
+            marginBottom: '16px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between'
+          }}>
+            <div>
+              <strong style={{ color: feasibilityColor, display: 'block', fontSize: '14px', marginBottom: '4px' }}>{feasibilityStatus}</strong>
+              <span style={{ color: '#cbd5e1', fontSize: '13px' }}>{feasibilityMessage}</span>
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '12px' }}>
+            <div style={{ width: '100%', height: '220px' }}>
+              <p style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px' }}>DTE Impact Tornado Chart</p>
+              <ResponsiveContainer>
+                <BarChart data={tornadoData} layout="vertical" margin={{ top: 0, right: 30, left: 10, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(148, 163, 184, 0.18)" horizontal={true} vertical={false} />
+                  <XAxis type="number" tick={{ fill: '#94a3b8', fontSize: 11 }} />
+                  <YAxis dataKey="name" type="category" tick={{ fill: '#94a3b8', fontSize: 11 }} width={80} />
+                  <Tooltip contentStyle={{ backgroundColor: '#020617', border: '1px solid rgba(148, 163, 184, 0.3)', borderRadius: '8px', color: '#e2e8f0', fontSize: '12px' }} />
+                  <Bar dataKey="impact" radius={[0, 4, 4, 0]}>
+                    {tornadoData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.impact < 0 ? '#ef4444' : '#22c55e'} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+            
+            <div style={{ width: '100%', height: '220px' }}>
+              <p style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px' }}>SOH Projection Horizon</p>
+              <ResponsiveContainer width="100%" height={160}>
               <LineChart data={twinCurve}>
                 <CartesianGrid stroke="rgba(148, 163, 184, 0.18)" strokeDasharray="3 3" />
                 <XAxis dataKey="day" stroke="#94a3b8" fontSize={11} />
@@ -659,8 +730,9 @@ export default function AdvancedIntelligenceSuite({
               </LineChart>
             </ResponsiveContainer>
           </div>
+          </div>
 
-            <p style={{ color: '#cbd5e1', fontSize: '12px' }}>
+          <p style={{ color: '#cbd5e1', fontSize: '12px' }}>
               Scenario change is being evaluated against the live pack context in {drivingMode} mode with {twinDistance} km route pressure and {Number(calculateDTE?.() || 0)} km available DTE.
             </p>
           </div>
