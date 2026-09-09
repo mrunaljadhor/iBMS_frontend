@@ -10,6 +10,11 @@ import {
   LineChart,
   Pie,
   PieChart,
+  PolarAngleAxis,
+  PolarGrid,
+  PolarRadiusAxis,
+  Radar,
+  RadarChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -21,7 +26,8 @@ import { TRINITY_DATASET_PROFILE } from '../utils/trinityDatasetProfile';
 const socColors = ['#22c55e', '#334155'];
 const utilizationColors = ['#38bdf8', '#374151'];
 const stressColors = ['#f97316', '#0ea5e9', '#f43f5e'];
-const cycleColors = ['#a78bfa', '#1e293b'];
+const degradationColors = ['#94a3b8', '#a78bfa', '#f97316', '#0ea5e9'];
+const efficiencyColors = ['#10b981', '#f97316'];
 
 const chartCardStyle = {
   background: 'linear-gradient(160deg, rgba(8, 10, 14, 0.96) 0%, rgba(2, 3, 6, 0.96) 100%)',
@@ -224,22 +230,23 @@ export default function OverviewAnalyticsPanel({
     { name: 'Low SOC', value: Number(healthMetrics.lowSocPenalty.toFixed(2)) }
   ];
 
-  const cycleCount = getNumeric(
-    batteryData?.Cycle_Count,
-    batteryData?.cycle_count,
-    activeDatasetProfile.cycleCount,
-    TRINITY_DATASET_PROFILE.cycleCount
-  );
-  const designCycleLife = getNumeric(
-    batteryData?.Design_Cycle_Life,
-    batteryData?.design_cycle_life,
-    activeDatasetProfile.designCycleLife,
-    TRINITY_DATASET_PROFILE.designCycleLife
-  );
-  const cycleUsedPct = designCycleLife > 0 ? Math.min(100, (cycleCount / designCycleLife) * 100) : 0;
-  const cycleUtilizationData = [
-    { name: 'Cycles Used', value: Number(cycleUsedPct.toFixed(1)) },
-    { name: 'Cycles Remaining', value: Number((100 - cycleUsedPct).toFixed(1)) }
+  const degradationData = [
+    { name: 'Calendar Aging', value: Number((healthMetrics.calendarFade || 0).toFixed(2)) },
+    { name: 'Cycle Aging', value: Number((healthMetrics.cycleFade || 0).toFixed(2)) },
+    { name: 'Thermal Stress', value: Number(healthMetrics.tempPenalty.toFixed(2)) },
+    { name: 'Cell Imbalance', value: Number(healthMetrics.imbalancePenalty.toFixed(2)) }
+  ];
+
+  const envelopeData = [
+    { subject: 'Temp', value: Math.min(100, (liveTemperature / 45) * 100), fullMark: 100 },
+    { subject: 'Volt Diff', value: Math.min(100, (liveVoltDiff / 0.15) * 100), fullMark: 100 },
+    { subject: 'Power', value: drivingMode === 'SPORT' ? 85 : 45, fullMark: 100 },
+    { subject: 'SOC', value: socSlider, fullMark: 100 },
+  ];
+
+  const efficiencyData = [
+    { name: 'Range (km)', ECO: Math.round((socSlider / 100) * 76), SPORT: Math.round((socSlider / 100) * 62) },
+    { name: 'Consump (Wh/km)', ECO: 150, SPORT: 250 }
   ];
 
   const kpiData = [
@@ -317,13 +324,13 @@ export default function OverviewAnalyticsPanel({
         }}>
           <div style={chartCardStyle}>
             <h4 style={{ fontSize: '14px', color: '#cbd5e1', marginBottom: '12px', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
-              Cycle Utilization
+              Degradation Contribution
             </h4>
             <div style={{ width: '100%', height: '200px' }}>
               <ResponsiveContainer>
                 <PieChart>
                   <Pie
-                    data={cycleUtilizationData}
+                    data={degradationData}
                     dataKey="value"
                     nameKey="name"
                     cx="50%"
@@ -333,8 +340,8 @@ export default function OverviewAnalyticsPanel({
                     paddingAngle={2}
                     stroke="none"
                   >
-                    {cycleUtilizationData.map((entry, index) => (
-                      <Cell key={`cycle-cell-${entry.name}`} fill={cycleColors[index % cycleColors.length]} />
+                    {degradationData.map((entry, index) => (
+                      <Cell key={`deg-cell-${entry.name}`} fill={degradationColors[index % degradationColors.length]} />
                     ))}
                   </Pie>
                   <Tooltip content={renderPieTooltip} wrapperStyle={{ outline: 'none' }} />
@@ -391,6 +398,41 @@ export default function OverviewAnalyticsPanel({
                     ))}
                   </Bar>
                 </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          <div style={chartCardStyle}>
+            <h4 style={{ fontSize: '14px', color: '#cbd5e1', marginBottom: '12px', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+              Mode Efficiency Comparison
+            </h4>
+            <div style={{ width: '100%', height: '200px' }}>
+              <ResponsiveContainer>
+                <BarChart data={efficiencyData} margin={{ top: 5, right: 0, left: -15, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(148, 163, 184, 0.18)" />
+                  <XAxis dataKey="name" tick={{ fill: '#94a3b8', fontSize: 11 }} />
+                  <YAxis tick={{ fill: '#94a3b8', fontSize: 11 }} />
+                  <Tooltip contentStyle={tooltipStyle} />
+                  <Legend wrapperStyle={{ fontSize: '11px', color: '#cbd5e1' }} />
+                  <Bar dataKey="ECO" fill={efficiencyColors[0]} radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="SPORT" fill={efficiencyColors[1]} radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          <div style={chartCardStyle}>
+            <h4 style={{ fontSize: '14px', color: '#cbd5e1', marginBottom: '12px', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+              Operating Envelope
+            </h4>
+            <div style={{ width: '100%', height: '200px' }}>
+              <ResponsiveContainer>
+                <RadarChart cx="50%" cy="50%" outerRadius="70%" data={envelopeData}>
+                  <PolarGrid stroke="rgba(148, 163, 184, 0.3)" />
+                  <PolarAngleAxis dataKey="subject" tick={{ fill: '#94a3b8', fontSize: 11 }} />
+                  <Radar name="Current Operation" dataKey="value" stroke="#38bdf8" fill="#38bdf8" fillOpacity={0.4} />
+                  <Tooltip contentStyle={tooltipStyle} />
+                </RadarChart>
               </ResponsiveContainer>
             </div>
           </div>

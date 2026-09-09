@@ -149,6 +149,8 @@ export function calculateBatteryHealthMetrics({ soc, temperatureC, voltageDiffV,
     lowSocPenalty: socStressPenalty,
     cycleCount: profile.cycleCount,
     designCycleLife: profile.designCycleLife,
-    batteryAgeYears: profile.batteryAgeYears
+    batteryAgeYears: profile.batteryAgeYears,
+    cycleFade,
+    calendarFade
   };
 }
