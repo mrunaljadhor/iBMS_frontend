@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { PieChart, Pie, Cell, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { calculateBatteryHealthMetrics } from '../utils/batteryHealth';
 import { TRINITY_DATASET_PROFILE } from '../utils/trinityDatasetProfile';
 
@@ -185,7 +186,44 @@ export default function LeftPanel({ userRole, batteryData, drivingMode, setDrivi
   });
 
   const soh = healthMetrics.soh;
-  const rul = healthMetrics.rulYears;
+  
+  const [customEol, setCustomEol] = useState(null);
+  const activeEol = customEol ?? healthMetrics.eolThreshold;
+  
+  const dynamicRul = Math.max(0, (soh - activeEol) / healthMetrics.yearlyDegradation);
+  const bestCaseRul = Math.max(0, (soh - activeEol) / (healthMetrics.yearlyDegradation * 0.85));
+  const worstCaseRul = Math.max(0, (soh - activeEol) / (healthMetrics.yearlyDegradation * 1.15));
+
+  const cycleFade = healthMetrics.cycleFade || 0;
+  const calendarFade = healthMetrics.calendarFade || 0;
+  const tempPenalty = healthMetrics.tempPenalty || 0;
+  const imbalancePenalty = healthMetrics.imbalancePenalty || 0;
+  const baseSoh = soh + cycleFade + calendarFade + tempPenalty + imbalancePenalty;
+  
+  const donutData = [
+    { name: 'Cycle Wear', value: cycleFade, color: '#f97316' },
+    { name: 'Calendar Aging', value: calendarFade, color: '#a855f7' },
+    { name: 'Temp Impact', value: tempPenalty, color: '#ef4444' },
+    { name: 'Imbalance', value: imbalancePenalty, color: '#eab308' },
+  ].filter(d => d.value > 0);
+
+  const currentYear = new Date().getFullYear();
+  const projectionData = [];
+  const resolution = Math.max(1, Math.floor(dynamicRul / 4));
+  for (let i = 0; i <= Math.ceil(dynamicRul); i += resolution) {
+    projectionData.push({
+      year: currentYear + i,
+      soh: Number(Math.max(activeEol, soh - (i * healthMetrics.yearlyDegradation)).toFixed(1)),
+      threshold: activeEol
+    });
+  }
+  if (dynamicRul > 0) {
+    projectionData.push({
+      year: Number((currentYear + dynamicRul).toFixed(1)),
+      soh: activeEol,
+      threshold: activeEol
+    });
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -552,50 +590,76 @@ export default function LeftPanel({ userRole, batteryData, drivingMode, setDrivi
           <div style={{
             background: 'linear-gradient(160deg, rgba(8, 10, 14, 0.96) 0%, rgba(2, 3, 6, 0.96) 100%)',
             border: `1px solid ${getSOHColor(soh)}`,
-            borderRadius: '12px',
+            borderRadius: '16px',
             padding: '24px',
-            boxShadow: '0 10px 30px rgba(0, 0, 0, 0.45)'
+            boxShadow: `0 10px 30px rgba(0, 0, 0, 0.45), inset 0 0 20px rgba(56, 189, 248, 0.05)`,
+            backdropFilter: 'blur(16px)'
           }} className="slide-up">
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
               <h3 style={{ fontSize: '20px', fontWeight: 'bold', color: 'white' }}>State of Health (SOH)</h3>
               <span style={{ fontSize: '11px', color: '#38bdf8', letterSpacing: '0.1em', textTransform: 'uppercase', border: '1px solid rgba(56, 189, 248, 0.45)', borderRadius: '9999px', padding: '4px 10px' }}>Health</span>
             </div>
 
-            <div style={{ marginBottom: '16px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                <span style={{ fontSize: '14px', color: '#9ca3af' }}>Battery Health Status</span>
-                <span style={{ fontSize: '28px', fontWeight: 'bold', color: getSOHColor(soh) }}>
-                  {soh.toFixed(1)}%
-                </span>
+            <div style={{ display: 'flex', gap: '20px', alignItems: 'center', marginBottom: '24px' }}>
+              {/* Circular Glowing Gauge */}
+              <div style={{ position: 'relative', width: '120px', height: '120px', flexShrink: 0 }}>
+                <svg width="120" height="120" viewBox="0 0 120 120">
+                  <circle cx="60" cy="60" r="54" fill="none" stroke="rgba(55, 65, 81, 0.5)" strokeWidth="8" />
+                  <circle 
+                    cx="60" cy="60" r="54" fill="none" 
+                    stroke={getSOHColor(soh)} strokeWidth="8" 
+                    strokeDasharray={`${(soh / 100) * 339.292} 339.292`}
+                    strokeDashoffset="0"
+                    strokeLinecap="round"
+                    style={{
+                      transform: 'rotate(-90deg)', transformOrigin: '50% 50%',
+                      transition: 'stroke-dasharray 1s ease-out',
+                      filter: `drop-shadow(0 0 6px ${getSOHColor(soh)})`
+                    }}
+                  />
+                </svg>
+                <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column' }}>
+                  <span style={{ fontSize: '24px', fontWeight: 'bold', color: getSOHColor(soh) }}>{soh.toFixed(1)}%</span>
+                  <span style={{ fontSize: '10px', color: '#9ca3af', textTransform: 'uppercase' }}>Current</span>
+                </div>
               </div>
-              <div style={{
-                height: '16px',
-                backgroundColor: 'rgba(55, 65, 81, 0.5)',
-                borderRadius: '9999px',
-                overflow: 'hidden',
-                border: '1px solid #4b5563'
-              }}>
-                <div style={{
-                  height: '100%',
-                  width: `${Math.min(soh, 100)}%`,
-                  background: `linear-gradient(90deg, ${getSOHColor(soh)} 0%, ${getSOHColor(soh)} 100%)`,
-                  transition: 'width 0.5s ease',
-                  boxShadow: `0 0 15px ${getSOHColor(soh)}`
-                }} />
+
+              {/* Degradation Breakdown Donut */}
+              <div style={{ flexGrow: 1, height: '140px', position: 'relative' }}>
+                <p style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', position: 'absolute', top: '-10px', left: 0 }}>Capacity Fade: {(baseSoh - soh).toFixed(1)}%</p>
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={donutData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={35}
+                      outerRadius={55}
+                      paddingAngle={5}
+                      dataKey="value"
+                      stroke="none"
+                    >
+                      {donutData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} style={{ filter: `drop-shadow(0 0 4px ${entry.color}80)` }} />
+                      ))}
+                    </Pie>
+                    <Tooltip 
+                      formatter={(value) => [`${value.toFixed(1)}%`, 'Impact']}
+                      contentStyle={{ backgroundColor: 'rgba(2, 6, 23, 0.9)', border: '1px solid rgba(148, 163, 184, 0.2)', borderRadius: '8px', fontSize: '12px', color: '#f8fafc' }}
+                      itemStyle={{ color: '#f8fafc' }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
               </div>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '12px', color: '#9ca3af' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px', backgroundColor: 'rgba(51, 65, 85, 0.3)', borderRadius: '6px' }}>
-                <span>Temperature Impact</span>
-                <span style={{ color: '#60a5fa' }}>{healthMetrics.tempPenalty.toFixed(1)}%</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px', backgroundColor: 'rgba(51, 65, 85, 0.3)', borderRadius: '6px' }}>
-                <span>Cell Imbalance Risk</span>
-                <span style={{ color: healthMetrics.imbalancePenalty > 5 ? '#f59e0b' : '#10b981' }}>
-                  {healthMetrics.imbalancePenalty.toFixed(1)}%
-                </span>
-              </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', fontSize: '12px', color: '#9ca3af' }}>
+              {donutData.map((item) => (
+                <div key={item.name} style={{ display: 'flex', justifyContent: 'space-between', padding: '10px', backgroundColor: 'rgba(51, 65, 85, 0.3)', borderRadius: '8px', borderLeft: `3px solid ${item.color}` }}>
+                  <span>{item.name}</span>
+                  <span style={{ color: '#f8fafc', fontWeight: 'bold' }}>{item.value.toFixed(1)}%</span>
+                </div>
+              ))}
             </div>
           </div>
 
@@ -627,63 +691,66 @@ export default function LeftPanel({ userRole, batteryData, drivingMode, setDrivi
 
             <div style={{
               display: 'grid',
-              gridTemplateColumns: '1fr 1fr',
-              gap: '16px',
-              marginBottom: '16px'
+              gridTemplateColumns: '1fr 2fr',
+              gap: '20px',
+              marginBottom: '24px'
             }}>
-              <div style={{ textAlign: 'center', padding: '16px', backgroundColor: 'rgba(51, 65, 85, 0.4)', borderRadius: '12px' }}>
-                <p style={{ fontSize: '11px', color: '#6b7280', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Years Remaining</p>
+              {/* Dynamic RUL Metric */}
+              <div style={{ textAlign: 'center', padding: '20px', backgroundColor: 'rgba(51, 65, 85, 0.25)', borderRadius: '16px', border: '1px solid rgba(148, 163, 184, 0.1)' }}>
+                <p style={{ fontSize: '11px', color: '#94a3b8', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Years Remaining</p>
                 <p style={{
-                  fontSize: '36px',
+                  fontSize: '42px',
                   fontWeight: 'bold',
-                  color: rul > 5 ? '#10b981' : rul > 2 ? '#f59e0b' : '#ef4444'
+                  color: dynamicRul > 5 ? '#10b981' : dynamicRul > 2 ? '#f59e0b' : '#ef4444',
+                  lineHeight: '1',
+                  textShadow: dynamicRul > 5 ? '0 0 20px rgba(16, 185, 129, 0.3)' : 'none'
                 }}>
-                  {rul.toFixed(1)}
+                  {dynamicRul.toFixed(1)}
                 </p>
-                <p style={{ fontSize: '11px', color: '#9ca3af', marginTop: '4px' }}>Until end of life</p>
+                <p style={{ fontSize: '11px', color: '#64748b', marginTop: '12px' }}>Range: {worstCaseRul.toFixed(1)} - {bestCaseRul.toFixed(1)} yrs</p>
               </div>
 
-              <div style={{ padding: '16px', backgroundColor: 'rgba(51, 65, 85, 0.4)', borderRadius: '12px' }}>
-                <p style={{ fontSize: '11px', color: '#6b7280', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Health Progression</p>
-                <div style={{
-                  height: '3px',
-                  backgroundColor: 'rgba(55, 65, 81, 0.5)',
-                  borderRadius: '9999px',
-                  marginBottom: '8px',
-                  overflow: 'hidden'
-                }}>
-                  <div style={{
-                    height: '100%',
-                    width: `${Math.min(soh, 100)}%`,
-                    background: `linear-gradient(90deg, #10b981 0%, #3b82f6 50%, #ef4444 100%)`,
-                    transition: 'width 0.5s ease'
-                  }} />
-                </div>
-                <p style={{ fontSize: '11px', color: '#9ca3af' }}>
-                  Current: <span style={{ color: '#60a5fa', fontWeight: 'bold' }}>{soh.toFixed(1)}%</span> → Threshold: {healthMetrics.eolThreshold}%
-                </p>
+              {/* Projection Curve */}
+              <div style={{ height: '160px', paddingRight: '10px' }}>
+                <p style={{ fontSize: '11px', color: '#94a3b8', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Degradation Trajectory</p>
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={projectionData} margin={{ top: 5, right: 0, left: -20, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(148, 163, 184, 0.1)" />
+                    <XAxis dataKey="year" stroke="#64748b" fontSize={10} tickFormatter={(tick) => `${tick}`} />
+                    <YAxis domain={['dataMin - 2', 'dataMax + 2']} stroke="#64748b" fontSize={10} />
+                    <Tooltip
+                      contentStyle={{ backgroundColor: 'rgba(2, 6, 23, 0.9)', border: '1px solid rgba(148, 163, 184, 0.2)', borderRadius: '8px' }}
+                      itemStyle={{ color: '#f8fafc', fontSize: '12px' }}
+                      labelStyle={{ color: '#94a3b8', fontSize: '11px' }}
+                    />
+                    <Line type="monotone" dataKey="soh" stroke="#38bdf8" strokeWidth={3} dot={{ r: 3, fill: '#0f172a', strokeWidth: 2 }} activeDot={{ r: 5 }} name="Projected SOH" />
+                    <Line type="stepAfter" dataKey="threshold" stroke="#ef4444" strokeWidth={1} strokeDasharray="5 5" dot={false} name="EOL Limit" />
+                  </LineChart>
+                </ResponsiveContainer>
               </div>
             </div>
 
-            <div style={{ padding: '12px', backgroundColor: 'rgba(100, 116, 139, 0.2)', borderRadius: '8px', marginBottom: '12px' }}>
-              <p style={{ fontSize: '12px', color: '#9ca3af' }}>
-                {rul > 5 ? 'Battery lifespan excellent - more than 5 years expected'
-                : rul > 3 ? 'Battery lifespan good - 3 to 5 years expected'
-                : rul > 1 ? 'Battery nearing end of life - 1 to 3 years remaining'
-                : 'Battery at end of life - replacement planning recommended'}
-              </p>
+            {/* Interactive Threshold Slider */}
+            <div style={{ backgroundColor: 'rgba(15, 23, 42, 0.5)', padding: '16px', borderRadius: '12px', border: '1px solid rgba(148, 163, 184, 0.1)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                <span style={{ fontSize: '13px', color: '#e2e8f0', fontWeight: '600' }}>Target EOL Threshold: <span style={{ color: '#ef4444' }}>{activeEol}%</span></span>
+                <span style={{ fontSize: '11px', color: '#64748b' }}>Drag to simulate extended life</span>
+              </div>
+              <input
+                type="range"
+                min="60"
+                max="85"
+                step="1"
+                value={activeEol}
+                onChange={(e) => setCustomEol(Number(e.target.value))}
+                style={{ width: '100%', accentColor: '#ef4444', cursor: 'pointer' }}
+              />
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '6px', fontSize: '10px', color: '#64748b' }}>
+                <span>60% (Extreme)</span>
+                <span>85% (Conservative)</span>
+              </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', fontSize: '11px', color: '#6b7280' }}>
-              <div>
-                <p><strong>Degradation Rate:</strong></p>
-                <p style={{ marginTop: '4px', color: '#9ca3af' }}>~{healthMetrics.yearlyDegradation.toFixed(1)}% per year</p>
-              </div>
-              <div>
-                <p><strong>End of Life at:</strong></p>
-                <p style={{ marginTop: '4px', color: '#9ca3af' }}>{healthMetrics.eolThreshold}% SOH</p>
-              </div>
-            </div>
           </div>
         </>
       )}
