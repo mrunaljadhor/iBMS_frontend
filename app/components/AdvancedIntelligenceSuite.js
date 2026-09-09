@@ -310,9 +310,10 @@ export default function AdvancedIntelligenceSuite({
     projected_dte: projectedDte,
     summary: {
       baseSoh: baseSoH,
-      loadIncreasePct,
+      payloadWeightKg,
+      terrainGradientPct,
+      fastChargeFreqPct,
       ambientTempDeltaC,
-      cycleStressPct,
       avgSpeedKmh,
       accelAggressionPct,
       brakingAggressionPct
@@ -343,9 +344,10 @@ export default function AdvancedIntelligenceSuite({
           }).catch(e => { console.error('Federated API error:', e); return null; }),
           postJson('/api/intelligence/digital-twin', {
             baseSoh: baseSoH,
-            loadIncreasePct,
+            payloadWeightKg,
+            terrainGradientPct,
+            fastChargeFreqPct,
             ambientTempDeltaC,
-            cycleStressPct,
             avgSpeedKmh,
             accelAggressionPct,
             brakingAggressionPct,
