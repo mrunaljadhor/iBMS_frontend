@@ -116,6 +116,8 @@ export default function RightMapPanel({
   const [routeCandidates, setRouteCandidates] = useState([]);
   const [selectedRouteId, setSelectedRouteId] = useState('');
   const [showMathModal, setShowMathModal] = useState(false);
+  const [elevationData, setElevationData] = useState({ uphillClimb: 0, downhillDescent: 0 });
+  const [isFetchingElevation, setIsFetchingElevation] = useState(false);
   const [routeInfo, setRouteInfo] = useState({
     distance: Number(routeDistance) || 0,
     duration: 0,
@@ -171,7 +173,7 @@ export default function RightMapPanel({
       alternativesEvaluated: candidates.length || 1,
       optimizationSummary: optimizationSummary || candidate.optimizationSummary || ''
     };
-    
+
     setRouteInfo(newRouteInfo);
     if (onRouteInfoUpdate) {
       onRouteInfoUpdate(newRouteInfo);
@@ -314,6 +316,42 @@ export default function RightMapPanel({
     }
   };
 
+  /*
+  ========================================================================
+  LIVE API: OPENTOPODATA (ELEVATION) EXTRACTION
+  ========================================================================
+  */
+  const fetchRouteElevation = async (originCoords, destCoords) => {
+    if (!originCoords || !destCoords) return;
+    
+    setIsFetchingElevation(true);
+    try {
+      const response = await fetch(`https://api.opentopodata.org/v1/srtm90m?locations=${originCoords.lat},${originCoords.lng}|${destCoords.lat},${destCoords.lng}`);
+      const data = await response.json();
+      
+      if (data.status === 'OK' && data.results && data.results.length === 2) {
+        const elevation1 = data.results[0].elevation || 0;
+        const elevation2 = data.results[1].elevation || 0;
+        const elevationDiff = elevation2 - elevation1;
+        
+        const uphillClimb = elevationDiff > 0 ? elevationDiff : 0;
+        const downhillDescent = elevationDiff < 0 ? Math.abs(elevationDiff) : 0;
+        
+        setElevationData({
+          uphillClimb: Number(uphillClimb.toFixed(1)),
+          downhillDescent: Number(downhillDescent.toFixed(1))
+        });
+      }
+    } catch (error) {
+      console.error("Failed to fetch OpenTopoData elevation:", error);
+    } finally {
+      setIsFetchingElevation(false);
+    }
+  };
+  /*
+  ========================================================================
+  */
+
   const buildTrafficAwareRoute = async (originCoords, destCoords) => {
     if (!window.google?.maps) {
       throw new Error('Google Maps is not ready yet.');
@@ -394,6 +432,22 @@ export default function RightMapPanel({
         const baseMinutes = Number((leg.duration.value / 60).toFixed(1));
         const trafficDurationSec = leg.duration_in_traffic?.value;
         const hasLiveTrafficDuration = Number.isFinite(trafficDurationSec);
+        /*
+        {
+          "routes": [
+            {
+              "legs": [
+                {
+                  "distance": { "text": "25.0 km", "value": 25000 },
+                  "duration": { "text": "35 mins", "value": 2100 },
+                  "duration_in_traffic": { "text": "55 mins", "value": 3300 }
+                }
+              ]
+            }
+          ],
+            "status": "OK"
+        }
+        */
         const trafficMinutes = Number(
           (((hasLiveTrafficDuration ? trafficDurationSec : leg.duration.value) || 0) / 60).toFixed(1)
         );
@@ -620,16 +674,16 @@ export default function RightMapPanel({
     const candidates = routes.map((route, index) => {
       const pts = [];
       route?.legs?.forEach(leg => {
-          if (leg.points) pts.push(...leg.points);
+        if (leg.points) pts.push(...leg.points);
       });
       if (!pts.length) return null;
-      
+
       const path = pts.map(p => ({ lat: p.latitude, lng: p.longitude }));
       const distanceKm = Number((route.summary.lengthInMeters / 1000).toFixed(2));
       const trafficMinutes = Number((route.summary.travelTimeInSeconds / 60).toFixed(1));
       const delayMinutes = Number(((route.summary.trafficDelayInSeconds || 0) / 60).toFixed(1));
       const staticMinutes = Number(Math.max(0, trafficMinutes - delayMinutes).toFixed(1));
-      
+
       const delayRatio = staticMinutes > 0 ? delayMinutes / staticMinutes : 0;
       const congestionRatio = staticMinutes > 0 ? Number((trafficMinutes / staticMinutes).toFixed(2)) : 1;
       const severity = trafficSeverityFromDelay(delayRatio);
@@ -637,21 +691,21 @@ export default function RightMapPanel({
 
       const sections = route.sections || [];
       const trafficSections = sections.filter(s => s.sectionType === 'TRAFFIC');
-      
+
       const segments = trafficSections.map((section, segmentIndex) => {
-         let speedCat = 'NORMAL';
-         if (section.simpleCategory === 'JAM' || section.simpleCategory === 'ROAD_CLOSURE' || section.magnitudeOfDelay > 2) {
-             speedCat = 'TRAFFIC_JAM';
-         } else if (section.magnitudeOfDelay > 0 || section.delayInSeconds > 20) {
-             speedCat = 'SLOW';
-         }
-         
-         return {
-             id: `tt-${index}-traf-${segmentIndex}`,
-             speed: speedCat,
-             color: trafficSegmentColor(speedCat),
-             path: path.slice(section.startPointIndex, Math.min(section.endPointIndex + 1, path.length))
-         };
+        let speedCat = 'NORMAL';
+        if (section.simpleCategory === 'JAM' || section.simpleCategory === 'ROAD_CLOSURE' || section.magnitudeOfDelay > 2) {
+          speedCat = 'TRAFFIC_JAM';
+        } else if (section.magnitudeOfDelay > 0 || section.delayInSeconds > 20) {
+          speedCat = 'SLOW';
+        }
+
+        return {
+          id: `tt-${index}-traf-${segmentIndex}`,
+          speed: speedCat,
+          color: trafficSegmentColor(speedCat),
+          path: path.slice(section.startPointIndex, Math.min(section.endPointIndex + 1, path.length))
+        };
       }).filter(s => s.speed !== 'NORMAL');
 
       return {
@@ -757,6 +811,9 @@ export default function RightMapPanel({
 
       setOrigin(originCoords);
       setDestination(destCoords);
+
+      // Concurrently fetch live Topographical data while routing
+      fetchRouteElevation(originCoords, destCoords);
 
       try {
         const optimizedTrafficRoute = await buildOptimizedTrafficRoute(originCoords, destCoords);
@@ -1325,7 +1382,7 @@ export default function RightMapPanel({
               <span>⚡</span> Zero-Cost Physics Telemetry
             </h3>
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              <button 
+              <button
                 onClick={() => setShowMathModal(true)}
                 style={{ fontSize: '11px', color: '#fff', backgroundColor: 'rgba(59, 130, 246, 0.6)', border: '1px solid #60a5fa', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
               >
@@ -1334,7 +1391,7 @@ export default function RightMapPanel({
               <span style={{ fontSize: '11px', color: '#93c5fd', backgroundColor: 'rgba(59, 130, 246, 0.2)', padding: '4px 8px', borderRadius: '4px' }}>OpenTopoData COP30 + TomTom</span>
             </div>
           </div>
-          
+
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
             <div style={{ backgroundColor: 'rgba(15, 23, 42, 0.6)', padding: '16px', borderRadius: '8px', border: '1px solid rgba(51, 65, 85, 0.5)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', color: '#9ca3af', fontSize: '13px', marginBottom: '4px' }}>
@@ -1342,10 +1399,10 @@ export default function RightMapPanel({
                 <span>⛰️</span>
               </div>
               <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#f87171' }}>
-                +{((routeInfo.distance || routeDistance || 0) * 4.2).toFixed(1)} <span style={{ fontSize: '14px', color: '#6b7280', fontWeight: 'normal' }}>m</span>
+                +{isFetchingElevation ? '...' : elevationData.uphillClimb} <span style={{ fontSize: '14px', color: '#6b7280', fontWeight: 'normal' }}>m</span>
               </div>
               <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
-                Grade: +{((((routeInfo.distance || routeDistance || 0) * 4.2) / ((routeInfo.distance || routeDistance || 1) * 1000)) * 100).toFixed(2)}%
+                Grade: +{isFetchingElevation ? '...' : (((elevationData.uphillClimb) / ((routeInfo.distance || routeDistance || 1) * 1000)) * 100).toFixed(2)}%
               </div>
             </div>
 
@@ -1355,10 +1412,10 @@ export default function RightMapPanel({
                 <span>📉</span>
               </div>
               <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#4ade80' }}>
-                -{((routeInfo.distance || routeDistance || 0) * 3.8).toFixed(1)} <span style={{ fontSize: '14px', color: '#6b7280', fontWeight: 'normal' }}>m</span>
+                -{isFetchingElevation ? '...' : elevationData.downhillDescent} <span style={{ fontSize: '14px', color: '#6b7280', fontWeight: 'normal' }}>m</span>
               </div>
               <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
-                Grade: -{((((routeInfo.distance || routeDistance || 0) * 3.8) / ((routeInfo.distance || routeDistance || 1) * 1000)) * 100).toFixed(2)}%
+                Grade: -{isFetchingElevation ? '...' : (((elevationData.downhillDescent) / ((routeInfo.distance || routeDistance || 1) * 1000)) * 100).toFixed(2)}%
               </div>
             </div>
 
@@ -1406,7 +1463,7 @@ export default function RightMapPanel({
               <h2 style={{ fontSize: '24px', fontWeight: 'bold', color: '#60a5fa' }}>Zero-Cost Physics Engine Math</h2>
               <button onClick={() => setShowMathModal(false)} style={{ background: 'none', border: 'none', color: '#94a3b8', fontSize: '24px', cursor: 'pointer' }}>&times;</button>
             </div>
-            
+
             <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
               {/* Uphill Formula */}
               <div>
