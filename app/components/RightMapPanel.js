@@ -326,7 +326,7 @@ export default function RightMapPanel({
     
     setIsFetchingElevation(true);
     try {
-      const response = await fetch(`https://api.opentopodata.org/v1/srtm90m?locations=${originCoords.lat},${originCoords.lng}|${destCoords.lat},${destCoords.lng}`);
+      const response = await fetch(`/api/elevation?locations=${originCoords.lat},${originCoords.lng}|${destCoords.lat},${destCoords.lng}`);
       const data = await response.json();
       
       if (data.status === 'OK' && data.results && data.results.length === 2) {
