@@ -249,6 +249,10 @@ export default function OverviewAnalyticsPanel({
     { name: 'Consump (Wh/km)', ECO: 150, SPORT: 250 }
   ];
 
+  const rulComparisonData = [
+    { name: 'RUL (Years)', Current: Number(healthMetrics.rulYears.toFixed(1)), Baseline: 10 }
+  ];
+
   const kpiData = [
     { label: 'SOC', value: `${socSlider.toFixed(1)}%`, accent: '#22c55e' },
     ...(userRole === 'analyst' ? [
@@ -433,6 +437,25 @@ export default function OverviewAnalyticsPanel({
                   <Radar name="Current Operation" dataKey="value" stroke="#38bdf8" fill="#38bdf8" fillOpacity={0.4} />
                   <Tooltip contentStyle={tooltipStyle} />
                 </RadarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          <div style={chartCardStyle}>
+            <h4 style={{ fontSize: '14px', color: '#cbd5e1', marginBottom: '12px', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+              RUL Projection Comparison
+            </h4>
+            <div style={{ width: '100%', height: '200px' }}>
+              <ResponsiveContainer>
+                <BarChart data={rulComparisonData} margin={{ top: 5, right: 0, left: -15, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(148, 163, 184, 0.18)" />
+                  <XAxis dataKey="name" tick={{ fill: '#94a3b8', fontSize: 11 }} />
+                  <YAxis tick={{ fill: '#94a3b8', fontSize: 11 }} />
+                  <Tooltip contentStyle={tooltipStyle} />
+                  <Legend wrapperStyle={{ fontSize: '11px', color: '#cbd5e1' }} />
+                  <Bar dataKey="Current" fill="#f59e0b" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="Baseline" fill="#10b981" radius={[4, 4, 0, 0]} />
+                </BarChart>
               </ResponsiveContainer>
             </div>
           </div>

@@ -152,12 +152,18 @@ function buildDigitalTwinCurve({ baseSoh, payloadWeightKg, ambientTempDeltaC, te
 
   return Array.from({ length: horizonDays + 1 }, (_, day) => {
     const baseline = clamp(baseSoh - (baseDailyDrop * day), 0, 100);
-    const scenario = clamp(baseSoh - (baseDailyDrop * scenarioMultiplier * day) - (payloadWeightKg * 0.001) - (ambientTempDeltaC * 0.12), 0, 100);
+    const scenarioDrop = baseDailyDrop * scenarioMultiplier;
+    const scenario = clamp(baseSoh - (scenarioDrop * day) - (payloadWeightKg * 0.001) - (ambientTempDeltaC * 0.12), 0, 100);
+
+    const baselineRul = Math.max(0, (baseline - 80) / (baseDailyDrop * 365));
+    const scenarioRul = Math.max(0, (scenario - 80) / (scenarioDrop * 365));
 
     return {
       day,
       baseline: Number(baseline.toFixed(1)),
-      scenario: Number(scenario.toFixed(1))
+      scenario: Number(scenario.toFixed(1)),
+      baselineRul: Number(baselineRul.toFixed(1)),
+      scenarioRul: Number(scenarioRul.toFixed(1))
     };
   });
 }
@@ -699,7 +705,7 @@ export default function AdvancedIntelligenceSuite({
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '12px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '12px' }}>
             <div style={{ width: '100%', height: '220px' }}>
               <p style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px' }}>DTE Impact Tornado Chart</p>
               <ResponsiveContainer>
@@ -729,6 +735,22 @@ export default function AdvancedIntelligenceSuite({
                 />
                 <Line type="monotone" dataKey="baseline" stroke="#38bdf8" strokeWidth={3} dot={false} name="Baseline SoH" />
                 <Line type="monotone" dataKey="scenario" stroke="#f97316" strokeWidth={3} dot={false} name="What-if SoH" />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+
+          <div style={{ width: '100%', height: '220px' }}>
+              <p style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px' }}>RUL Projection Horizon</p>
+              <ResponsiveContainer width="100%" height={160}>
+              <LineChart data={twinCurve}>
+                <CartesianGrid stroke="rgba(148, 163, 184, 0.18)" strokeDasharray="3 3" />
+                <XAxis dataKey="day" stroke="#94a3b8" fontSize={11} />
+                <YAxis domain={[0, 'auto']} stroke="#94a3b8" fontSize={11} />
+                <Tooltip
+                  contentStyle={{ background: '#020617', border: '1px solid rgba(148, 163, 184, 0.25)', borderRadius: '10px', color: '#e2e8f0' }}
+                />
+                <Line type="monotone" dataKey="baselineRul" stroke="#10b981" strokeWidth={3} dot={false} name="Baseline RUL (Yrs)" />
+                <Line type="monotone" dataKey="scenarioRul" stroke="#ef4444" strokeWidth={3} dot={false} name="What-if RUL (Yrs)" />
               </LineChart>
             </ResponsiveContainer>
           </div>
