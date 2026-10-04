@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/intelligence/:path*",
+      "destination": "/api/index"
+    }
+  ]
+}
