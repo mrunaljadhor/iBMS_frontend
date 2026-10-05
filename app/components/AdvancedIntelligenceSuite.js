@@ -88,19 +88,13 @@ function buildWhispererAnswer(question, liveContext) {
   const liveRul = Number(liveContext.healthMetrics?.rulYears?.toFixed?.(1) ?? liveContext.healthMetrics?.rulYears ?? 0);
   const estimatedRange = typeof liveContext.calculateDTE === 'function' ? liveContext.calculateDTE() : 0;
 
-  let answer = `I scanned ${ranked.length} batteries${region ? ` in the ${region.toLowerCase()}` : ''}. `;
-
+  let answer = `Hello! I am your AI Fleet Assistant, powered by **Google Gemini**. \n\nI can analyze ${ranked.length} batteries across your fleet. `;
+  
   if (topBattery) {
-    answer += `${topBattery.id} is the highest-risk unit with ${topBattery.soh.toFixed(1)}% SoH, ${topBattery.temperature.toFixed(1)}°C, and a risk score of ${topBattery.riskScore.toFixed(1)}. `;
+    answer += `Currently, ${topBattery.id} is the highest-risk unit (SoH: ${topBattery.soh.toFixed(1)}%). `;
   }
 
-  if (critical.length) {
-    answer += `${critical.map((battery) => battery.id).join(', ')} are already below the 80% SoH threshold and should be prioritized for inspection this week. `;
-  } else if (ranked.length) {
-    answer += 'No units in the selected slice are below 80% SoH yet, but the top-ranked batteries should be monitored daily. ';
-  }
-
-  answer += `The live pack context currently shows ${liveSoH.toFixed(1)}% SoH, ${liveRul.toFixed(1)} years of RUL, and an estimated DTE of ${estimatedRange} km.`;
+  answer += `\n\nAsk me anything about maintenance, risks, or predictions to trigger a live AI analysis!`;
 
   return {
     answer,
@@ -137,7 +131,7 @@ function buildXaiBreakdown(healthMetrics, batteryData) {
     percent: Number(((factor.value / total) * 100).toFixed(1))
   }));
 
-  const narrative = `RUL is primarily driven by ${normalized[0].label.toLowerCase()} and ${normalized[1].label.toLowerCase()} for ${batteryData?.Dataset_Name || TRINITY_DATASET_PROFILE.datasetName}.`;
+  const narrative = `Waiting for AI analysis... Click 'Run AI Analysis' or ask the Whisperer to analyze these factors using Google Gemini.`;
 
   return {
     normalized,
