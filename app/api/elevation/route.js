@@ -9,6 +9,22 @@ export async function GET(request) {
   }
 
   try {
+    /*
+    EXPECTED JSON RESPONSE FORMAT FROM OPENTOPODATA:
+    {
+      "results": [
+        {
+          "elevation": 216.5,
+          "location": {
+            "lat": 28.6328,
+            "lng": 77.2197
+          },
+          "dataset": "srtm90m"
+        }
+      ],
+      "status": "OK"
+    }
+    */
     const response = await fetch(`https://api.opentopodata.org/v1/srtm90m?locations=${locations}`, {
       // Use cache: 'no-store' if we want to ensure fresh fetches, but caching topography is actually fine
       next: { revalidate: 3600 } 
