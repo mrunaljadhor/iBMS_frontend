@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { GoogleGenAI } from '@google/genai';
 
+export const dynamic = 'force-dynamic';
+
 export async function POST(request) {
   const data = await request.json();
   const round = data.rounds || 3;
