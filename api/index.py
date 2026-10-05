@@ -15,14 +15,18 @@ except ImportError:
     pass
 
 @app.route('/api/intelligence/whisperer', methods=['POST'])
-def whisperer():
+@app.route('/api/index', methods=['POST']) # Catch Vercel rewrite
+def handler():
+    if request.path == '/api/index' and request.args.get('route') == 'xai':
+        return xai_breakdown()
+    
     data = request.json or {}
     question = data.get('question', '')
     context = data.get('liveContext', {})
 
     api_key = os.environ.get("OPENAI_API_KEY")
     if not api_key:
-        return jsonify({"answer": "Error: OPENAI_API_KEY is not set in Vercel Environment Variables.", "citations": []}), 500
+        return jsonify({"answer": "Error: OPENAI_API_KEY is not set in Vercel Environment Variables.", "citations": []}), 200
 
     client = openai.OpenAI(api_key=api_key)
 
@@ -59,7 +63,7 @@ def whisperer():
             ]
         })
     except Exception as e:
-        return jsonify({"answer": f"AI Integration Error: {str(e)}", "citations": []}), 500
+        return jsonify({"answer": f"AI Integration Error: {str(e)}", "citations": []}), 200
 
 
 @app.route('/api/intelligence/xai', methods=['POST'])

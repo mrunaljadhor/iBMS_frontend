@@ -336,7 +336,7 @@ export default function AdvancedIntelligenceSuite({
     const syncAnalytics = async () => {
       try {
         const [xaiResult, federatedResult, twinResult] = await Promise.all([
-          postJson('/api/intelligence/xai', {
+          postJson('/api/index?route=xai', {
             voltage: Number(batteryData?.Voltage_V || batteryData?.Voltage || 0),
             current: Number(batteryData?.Current_A || batteryData?.Current || 0),
             temperature: liveTemperature,
@@ -394,7 +394,7 @@ export default function AdvancedIntelligenceSuite({
     let response = null;
 
     try {
-      response = await postJson('/api/intelligence/whisperer', {
+      response = await postJson('/api/index?route=whisperer', {
         question: trimmed,
         liveContext: {
           socSlider,
