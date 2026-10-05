@@ -17,6 +17,7 @@
     "persist:delete": "npx pm2 delete trinity-dashboard"
   },
   "dependencies": {
+    "@google/genai": "^2.27.0",
     "@react-google-maps/api": "^2.19.2",
     "autoprefixer": "^10.4.16",
     "axios": "^1.6.2",

@@ -245,27 +245,27 @@ async function localWhisperer(body = {}) {
   const question = String(body.question || '').trim() || 'fleet risk overview';
   const context = body.liveContext || {};
 
-  const apiKey = process.env.OPENAI_API_KEY;
+  const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     return {
-      answer: '[Config Error] OPENAI_API_KEY is not set. Go to Vercel → Settings → Environment Variables and add it.',
+      answer: '[Config Error] GEMINI_API_KEY is not set. Go to Vercel → Settings → Environment Variables and add it.',
       citations: [],
       confidence: 'Low',
       ranked: []
     };
   }
 
-  const { OpenAI } = await import('openai').catch(() => ({ OpenAI: null }));
-  if (!OpenAI) {
+  const { GoogleGenAI } = await import('@google/genai').catch(() => ({ GoogleGenAI: null }));
+  if (!GoogleGenAI) {
     return {
-      answer: '[Dependency Error] OpenAI SDK is not installed.',
+      answer: '[Dependency Error] @google/genai SDK is not installed.',
       citations: [],
       confidence: 'Low',
       ranked: []
     };
   }
 
-  const client = new OpenAI({ apiKey });
+  const ai = new GoogleGenAI({ apiKey });
   const systemPrompt = `You are the 'Battery Whisperer', an advanced AI for a motorcycle fleet management dashboard (iBMS).
 Your job is to answer the fleet manager's questions based on the live telemetry context provided.
 Keep your answers concise, professional, and directly address the risk or status of the batteries.
@@ -280,28 +280,30 @@ Note: Assume there are multiple fleets (Northern, Southern, Central) if asked ab
 High temp (>35C) or low SOC (<20%) is considered risky.`;
 
   try {
-    const response = await client.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: question }
-      ],
-      temperature: 0.4,
-      max_tokens: 250
+    const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: [
+            { role: 'user', parts: [{ text: question }] }
+        ],
+        config: {
+            systemInstruction: systemPrompt,
+            temperature: 0.4,
+            maxOutputTokens: 250,
+        }
     });
 
     return {
-      answer: response.choices[0].message.content,
+      answer: response.text,
       confidence: 'High',
       citations: [
-        { label: 'LLM Provider', detail: 'OpenAI (gpt-4o-mini)' },
+        { label: 'LLM Provider', detail: 'Google Gemini (gemini-2.5-flash)' },
         { label: 'Live Telemetry', detail: `SOC ${context.socSlider || 0}% at ${context.temperature || 25}°C` }
       ],
       ranked: []
     };
   } catch (error) {
     return {
-      answer: `[OpenAI Error] ${error.message}`,
+      answer: `[Gemini Error] ${error.message}`,
       citations: [],
       confidence: 'Low',
       ranked: []
