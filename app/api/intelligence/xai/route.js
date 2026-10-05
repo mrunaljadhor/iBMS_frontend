@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import OpenAI from 'openai';
+import { GoogleGenAI } from '@google/genai';
 
 export async function POST(request) {
   const data = await request.json();
@@ -26,17 +26,22 @@ export async function POST(request) {
 
   let narrative = `RUL is primarily driven by ${breakdown[0].label.toLowerCase()} and ${breakdown[1].label.toLowerCase()}.`;
 
-  const apiKey = process.env.OPENAI_API_KEY;
+  const apiKey = process.env.GEMINI_API_KEY;
   if (apiKey) {
     try {
-      const client = new OpenAI({ apiKey });
+      const ai = new GoogleGenAI({ apiKey });
       const prompt = `Write a 1-sentence analytical summary stating that RUL is primarily driven by '${breakdown[0].label}' (${breakdown[0].percent}%) and '${breakdown[1].label}' (${breakdown[1].percent}%).`;
-      const response = await client.chat.completions.create({
-        model: 'gpt-4o-mini',
-        messages: [{ role: 'user', content: prompt }],
-        max_tokens: 50
+      
+      const response = await ai.models.generateContent({
+          model: 'gemini-2.5-flash',
+          contents: [{ role: 'user', parts: [{ text: prompt }] }],
+          config: {
+              maxOutputTokens: 50,
+          }
       });
-      narrative = response.choices[0].message.content;
+      if (response.text) {
+        narrative = response.text.trim();
+      }
     } catch {
       // Use default narrative on failure
     }
