@@ -406,16 +406,11 @@ export default function AdvancedIntelligenceSuite({
         }
       });
     } catch (error) {
-      console.error('Whisperer request failed, using local fallback:', error);
-      response = buildWhispererAnswer(trimmed, {
-        socSlider,
-        routeDistance,
-        drivingMode,
-        datasetName: datasetProfile?.datasetName,
-        calculateDTE,
-        healthMetrics,
-        temperature: liveTemperature
-      });
+      console.error('Whisperer request failed:', error);
+      response = { 
+        answer: `[API Error] Could not connect to Python backend: ${error.message}. Please check Vercel logs or ensure OPENAI_API_KEY is valid.`,
+        citations: []
+      };
     }
 
     setMessages((current) => [
