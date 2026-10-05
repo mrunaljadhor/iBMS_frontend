@@ -241,39 +241,72 @@ function localFeasibility(body = {}) {
   };
 }
 
-function localWhisperer(body = {}) {
+async function localWhisperer(body = {}) {
   const question = String(body.question || '').trim() || 'fleet risk overview';
-  const region = regionFromQuestion(question);
-  const fleet = region ? SAMPLE_FLEET.filter((battery) => battery.region === region) : SAMPLE_FLEET;
-  const ranked = [...fleet]
-    .map((battery) => ({ ...battery, riskScore: Number(scoreFleetBattery(battery).toFixed(1)) }))
-    .sort((left, right) => right.riskScore - left.riskScore);
-  const top = ranked[0];
-  const critical = ranked.filter((battery) => battery.soh < 80);
-  const snippets = KNOWLEDGE_SNIPPETS.filter((snippet) => {
-    const normalized = question.toLowerCase();
-    return normalized.includes('hot') || normalized.includes('risk') || normalized.includes('battery') || normalized.includes('maintenance') ? true : false;
-  }).slice(0, 3);
+  const context = body.liveContext || {};
 
-  let answer = `I scanned ${ranked.length} batteries${region ? ` in the ${region.toLowerCase()}` : ''}. `;
-  if (top) {
-    answer += `${top.id} is the highest-risk unit with ${top.soh.toFixed(1)}% SoH, ${top.temperature.toFixed(1)}°C, and a risk score of ${top.riskScore.toFixed(1)}. `;
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    return {
+      answer: '[Config Error] OPENAI_API_KEY is not set. Go to Vercel → Settings → Environment Variables and add it.',
+      citations: [],
+      confidence: 'Low',
+      ranked: []
+    };
   }
-  if (critical.length) {
-    answer += `${critical.slice(0, 3).map((battery) => battery.id).join(', ')} are already below the 80% SoH threshold and should be prioritized for inspection this week. `;
-  }
-  answer += 'This Vercel deployment is using a local RAG-style fallback unless an external backend is configured. ';
 
-  return {
-    answer,
-    confidence: ranked.length ? 'High' : 'Medium',
-    citations: [
-      { label: 'Knowledge snippets', detail: snippets.join(' ') || 'No matching snippets found' },
-      { label: 'Historical fleet logs', detail: `${ranked.length} records scanned from ${region || 'all regions'}; top battery ${top?.id || 'n/a'} is leading the risk ranking` },
-      { label: 'Live telemetry', detail: `SOC ${Number(body.liveContext?.socSlider || 0).toFixed(1)}%, temperature ${Number(body.liveContext?.temperature || 0).toFixed(1)}°C, route ${Number(body.liveContext?.routeDistance || 0)} km` },
-    ],
-    ranked,
-  };
+  const { OpenAI } = await import('openai').catch(() => ({ OpenAI: null }));
+  if (!OpenAI) {
+    return {
+      answer: '[Dependency Error] OpenAI SDK is not installed.',
+      citations: [],
+      confidence: 'Low',
+      ranked: []
+    };
+  }
+
+  const client = new OpenAI({ apiKey });
+  const systemPrompt = `You are the 'Battery Whisperer', an advanced AI for a motorcycle fleet management dashboard (iBMS).
+Your job is to answer the fleet manager's questions based on the live telemetry context provided.
+Keep your answers concise, professional, and directly address the risk or status of the batteries.
+
+LIVE FLEET CONTEXT:
+- Active Dataset / Mode: ${context.datasetName || 'Unknown'} | ${context.drivingMode || 'ECO'}
+- Current SOC: ${context.socSlider || 0}%
+- Battery Temperature: ${context.temperature || 25}°C
+- Route Distance: ${context.routeDistance || 0} km
+- Estimated DTE (Range): ${context.dte || 0} km
+Note: Assume there are multiple fleets (Northern, Southern, Central) if asked about them.
+High temp (>35C) or low SOC (<20%) is considered risky.`;
+
+  try {
+    const response = await client.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: question }
+      ],
+      temperature: 0.4,
+      max_tokens: 250
+    });
+
+    return {
+      answer: response.choices[0].message.content,
+      confidence: 'High',
+      citations: [
+        { label: 'LLM Provider', detail: 'OpenAI (gpt-4o-mini)' },
+        { label: 'Live Telemetry', detail: `SOC ${context.socSlider || 0}% at ${context.temperature || 25}°C` }
+      ],
+      ranked: []
+    };
+  } catch (error) {
+    return {
+      answer: `[OpenAI Error] ${error.message}`,
+      citations: [],
+      confidence: 'Low',
+      ranked: []
+    };
+  }
 }
 
 function localXai(body = {}) {
