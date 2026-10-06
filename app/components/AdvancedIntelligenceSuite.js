@@ -186,7 +186,7 @@ export default function AdvancedIntelligenceSuite({
   calculateDTE,
   datasetProfile
 }) {
-  const [question, setQuestion] = useState(whispererPrompts[0]);
+  const [question, setQuestion] = useState('');
   const [messages, setMessages] = useState([]);
   const [edgeClients, setEdgeClients] = useState(6);
   const [federatedRound, setFederatedRound] = useState(3);
