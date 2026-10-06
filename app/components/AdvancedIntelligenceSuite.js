@@ -327,51 +327,54 @@ export default function AdvancedIntelligenceSuite({
   useEffect(() => {
     let cancelled = false;
 
-    const syncAnalytics = async () => {
-      try {
-        const [xaiResult, federatedResult, twinResult] = await Promise.all([
-          postJson('/api/intelligence/xai', {
-            voltage: Number(batteryData?.Voltage_V || batteryData?.Voltage || 0),
-            current: Number(batteryData?.Current_A || batteryData?.Current || 0),
-            temperature: liveTemperature,
-            cycleCount: Number(batteryData?.Cycle_Count || 0),
-            soc: socSlider,
-            datasetProfile
-          }).catch(e => { console.error('XAI API error:', e); return null; }),
-          postJson('/api/intelligence/federated', {
-            rounds: federatedRound,
-            edgeNodes: edgeClients
-          }).catch(e => { console.error('Federated API error:', e); return null; }),
-          postJson('/api/intelligence/digital-twin', {
-            baseSoh: baseSoH,
-            payloadWeightKg,
-            terrainGradientPct,
-            fastChargeFreqPct,
-            ambientTempDeltaC,
-            avgSpeedKmh,
-            accelAggressionPct,
-            brakingAggressionPct,
-            days: 7
-          }).catch(e => { console.error('Twin API error:', e); return null; })
-        ]);
+    const timer = setTimeout(() => {
+      const syncAnalytics = async () => {
+        try {
+          const [xaiResult, federatedResult, twinResult] = await Promise.all([
+            postJson('/api/intelligence/xai', {
+              voltage: Number(batteryData?.Voltage_V || batteryData?.Voltage || 0),
+              current: Number(batteryData?.Current_A || batteryData?.Current || 0),
+              temperature: liveTemperature,
+              cycleCount: Number(batteryData?.Cycle_Count || 0),
+              soc: socSlider,
+              datasetProfile
+            }).catch(e => { console.error('XAI API error:', e); return null; }),
+            postJson('/api/intelligence/federated', {
+              rounds: federatedRound,
+              edgeNodes: edgeClients
+            }).catch(e => { console.error('Federated API error:', e); return null; }),
+            postJson('/api/intelligence/digital-twin', {
+              baseSoh: baseSoH,
+              payloadWeightKg,
+              terrainGradientPct,
+              fastChargeFreqPct,
+              ambientTempDeltaC,
+              avgSpeedKmh,
+              accelAggressionPct,
+              brakingAggressionPct,
+              days: 7
+            }).catch(e => { console.error('Twin API error:', e); return null; })
+          ]);
 
-        if (!cancelled) {
-          setRemoteAnalytics((current) => ({
-            ...current,
-            xai: xaiResult || current.xai,
-            federated: federatedResult || current.federated,
-            twin: twinResult || null
-          }));
+          if (!cancelled) {
+            setRemoteAnalytics((current) => ({
+              ...current,
+              xai: xaiResult || current.xai,
+              federated: federatedResult || current.federated,
+              twin: twinResult || null
+            }));
+          }
+        } catch (error) {
+          console.error('Failed to sync analytics:', error);
         }
-      } catch (error) {
-        console.error('Failed to sync analytics:', error);
-      }
-    };
+      };
 
-    syncAnalytics();
+      syncAnalytics();
+    }, 800);
 
     return () => {
       cancelled = true;
+      clearTimeout(timer);
     };
   }, [batteryData, baseSoH, payloadWeightKg, datasetProfile, edgeClients, federatedRound, liveTemperature, terrainGradientPct, socSlider, fastChargeFreqPct, ambientTempDeltaC, avgSpeedKmh, accelAggressionPct, brakingAggressionPct, twinDistance]);
 
