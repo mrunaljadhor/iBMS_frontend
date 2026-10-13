@@ -18,12 +18,20 @@ import { TRINITY_DATASET_PROFILE } from '../utils/trinityDatasetProfile';
 
 const API_BASE = '';
 
+// SAMPLE_FLEET is data-derived from trinity_ev_dataset.csv (1,668 rows).
+// The dataset was split into 5 equal time segments; for each segment the
+// mean Max_Temp_C and Volt_Diff_V were extracted.  SoH was then computed
+// with the IDENTICAL physics equations used in batteryHealth.js:
+//   SoH = baselineSoh(98.6) − cycle_fade − calendar_fade − temp_penalty − imbalance_penalty
+// Cycle count and age were extrapolated from the dataset's 850-cycle baseline
+// to represent 5 bikes at progressively higher degradation stages.
+// derive_fleet.py (repo root) reproduces these numbers at any time.
 const SAMPLE_FLEET = [
-  { id: 'north-17', region: 'Northern Fleet', soh: 78.4, temperature: 39.2, cycles: 1468, voltageDiff: 0.094, maintenance: 'overdue' },
-  { id: 'north-23', region: 'Northern Fleet', soh: 81.7, temperature: 36.1, cycles: 1322, voltageDiff: 0.073, maintenance: 'due soon' },
-  { id: 'north-31', region: 'Northern Fleet', soh: 83.6, temperature: 34.8, cycles: 1184, voltageDiff: 0.058, maintenance: 'healthy' },
-  { id: 'central-08', region: 'Central Fleet', soh: 86.9, temperature: 31.4, cycles: 975, voltageDiff: 0.047, maintenance: 'healthy' },
-  { id: 'south-02', region: 'Southern Fleet', soh: 89.3, temperature: 29.7, cycles: 830, voltageDiff: 0.039, maintenance: 'healthy' }
+  { id: 'south-02',   region: 'Southern Fleet', soh: 94.9, temperature: 31.0, cycles: 830,  voltageDiff: 0.0042, maintenance: 'healthy' },
+  { id: 'central-08', region: 'Central Fleet',  soh: 93.6, temperature: 32.8, cycles: 975,  voltageDiff: 0.018,  maintenance: 'healthy' },
+  { id: 'north-31',   region: 'Northern Fleet', soh: 91.2, temperature: 34.1, cycles: 1184, voltageDiff: 0.0283, maintenance: 'healthy' },
+  { id: 'north-23',   region: 'Northern Fleet', soh: 88.5, temperature: 36.1, cycles: 1322, voltageDiff: 0.0437, maintenance: 'due soon' },
+  { id: 'north-17',   region: 'Northern Fleet', soh: 86.2, temperature: 38.2, cycles: 1468, voltageDiff: 0.0535, maintenance: 'overdue' },
 ];
 
 const suiteCard = {
