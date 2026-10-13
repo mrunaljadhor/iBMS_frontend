@@ -207,6 +207,7 @@ export default function AdvancedIntelligenceSuite({
   const [brakingAggressionPct, setBrakingAggressionPct] = useState(10);
   const [twinDistance, setTwinDistance] = useState(routeDistance || 25);
   const [remoteAnalytics, setRemoteAnalytics] = useState({ whisperer: null, xai: null, federated: null, twin: null });
+  const [xaiTarget, setXaiTarget] = useState('RUL'); // active SHAP target tab
 
   const liveTemperature = Number(batteryData?.Max_Temp_C || batteryData?.temperature || 25);
   const liveVoltDiff = Number(batteryData?.Volt_Diff_V || batteryData?.voltage_diff || 0.05);
@@ -294,16 +295,20 @@ export default function AdvancedIntelligenceSuite({
     temperature: liveTemperature
   });
 
+  // New multi-target XAI shape: { attributions: {SoH, RUL, DTE, 'Risk Score'}, narrative, signal }
+  // Fall back to buildXaiBreakdown() until the first API response arrives
+  const XAI_TARGETS = ['SoH', 'RUL', 'DTE', 'Risk Score'];
   const xaiDisplay = remoteAnalytics.xai
     ? {
-        normalized: (remoteAnalytics.xai.breakdown || []).map((factor) => ({
-          label: factor.label,
-          percent: factor.percent
-        })),
+        normalized: (remoteAnalytics.xai.attributions?.[xaiTarget] || remoteAnalytics.xai.breakdown || []),
         narrative: remoteAnalytics.xai.narrative,
         signal: remoteAnalytics.xai.signal
       }
-    : xai;
+    : {
+        ...xai,
+        // offline fallback: use same bars for every target, just relabel narrative
+        narrative: `Waiting for live AI analysis… (showing ${xaiTarget} attribution estimate)`
+      };
 
   const federatedDisplay = remoteAnalytics.federated || {
     round: federatedRound,
@@ -340,12 +345,13 @@ export default function AdvancedIntelligenceSuite({
         try {
           const [xaiResult, federatedResult, twinResult] = await Promise.all([
             postJson('/api/intelligence/xai', {
-              voltage: Number(batteryData?.Voltage_V || batteryData?.Voltage || 0),
-              current: Number(batteryData?.Current_A || batteryData?.Current || 0),
+              voltage:     Number(batteryData?.Voltage_V || batteryData?.Voltage || 63.5),
+              current:     Number(batteryData?.Current_A || batteryData?.Current || 0),
               temperature: liveTemperature,
-              cycleCount: Number(batteryData?.Cycle_Count || 0),
-              soc: socSlider,
-              datasetProfile
+              voltageDiff: liveVoltDiff,
+              cycleCount:  Number(batteryData?.Cycle_Count || datasetProfile?.cycleCount || 850),
+              soc:         socSlider,
+              drivingMode: drivingMode || 'ECO',
             }).catch(e => { console.error('XAI API error:', e); return null; }),
             postJson('/api/intelligence/federated', {
               rounds: federatedRound,
@@ -534,38 +540,62 @@ export default function AdvancedIntelligenceSuite({
             <span className="badge-warning">SHAP / LIME</span>
           </div>
 
-          <div style={{ marginBottom: '12px', ...miniCard }}>
-            <p style={{ fontSize: '12px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '4px' }}>Why this RUL</p>
-            <p style={{ color: '#f8fafc', fontSize: '13px' }}>{xaiDisplay.narrative}</p>
-          </div>
-
-          <div style={{ display: 'grid', gap: '10px' }}>
-            {xaiDisplay.normalized.map((factor) => (
-              <div key={factor.label} style={miniCard}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                  <span style={{ color: '#e2e8f0', fontSize: '12px' }}>{factor.label}</span>
-                  <span style={{ color: '#7dd3fc', fontSize: '12px', fontWeight: 700 }}>{factor.percent}%</span>
-                </div>
-                <div style={{ height: '8px', borderRadius: '999px', background: 'rgba(71, 85, 105, 0.5)', overflow: 'hidden' }}>
-                  <div
-                    style={{
-                      width: `${factor.percent}%`,
-                      height: '100%',
-                      borderRadius: 'inherit',
-                      background: 'linear-gradient(90deg, #22c55e, #38bdf8)'
-                    }}
-                  />
-                </div>
-              </div>
+          {/* Target selector tabs */}
+          <div style={{ display: 'flex', gap: '6px', marginBottom: '14px', flexWrap: 'wrap' }}>
+            {XAI_TARGETS.map((t) => (
+              <button
+                key={t}
+                onClick={() => setXaiTarget(t)}
+                style={{
+                  padding: '5px 12px',
+                  borderRadius: '999px',
+                  fontSize: '11px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  border: xaiTarget === t ? '1px solid #f59e0b' : '1px solid rgba(148,163,184,0.25)',
+                  background: xaiTarget === t ? 'rgba(245,158,11,0.18)' : 'rgba(15,23,42,0.5)',
+                  color: xaiTarget === t ? '#fcd34d' : '#94a3b8',
+                  transition: 'all 0.2s'
+                }}
+              >
+                {t}
+              </button>
             ))}
           </div>
 
-            <div style={{ marginTop: '12px', ...miniCard }}>
-              <p style={{ fontSize: '12px', color: '#94a3b8', marginBottom: '4px' }}>Current signal</p>
-              <p style={{ color: '#f8fafc', fontSize: '13px' }}>{xaiDisplay.signal}</p>
-            </div>
+          <div style={{ marginBottom: '12px', ...miniCard }}>
+            <p style={{ fontSize: '12px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '4px' }}>Why this {xaiTarget}</p>
+            <p style={{ color: '#f8fafc', fontSize: '13px', lineHeight: 1.6 }}>{xaiDisplay.narrative}</p>
           </div>
-          </>
+
+          <div style={{ display: 'grid', gap: '8px' }}>
+            {xaiDisplay.normalized.map((factor, idx) => {
+              // Color gradient shifts per rank: gold → cyan → slate
+              const barColor = idx === 0
+                ? 'linear-gradient(90deg, #f59e0b, #fcd34d)'
+                : idx === 1
+                ? 'linear-gradient(90deg, #22c55e, #38bdf8)'
+                : 'linear-gradient(90deg, #6366f1, #38bdf8)';
+              return (
+                <div key={factor.label} style={miniCard}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                    <span style={{ color: '#e2e8f0', fontSize: '12px' }}>{factor.label}</span>
+                    <span style={{ color: '#7dd3fc', fontSize: '12px', fontWeight: 700 }}>{factor.percent}%</span>
+                  </div>
+                  <div style={{ height: '8px', borderRadius: '999px', background: 'rgba(71, 85, 105, 0.5)', overflow: 'hidden' }}>
+                    <div style={{ width: `${factor.percent}%`, height: '100%', borderRadius: 'inherit', background: barColor, transition: 'width 0.5s ease' }} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <div style={{ marginTop: '12px', ...miniCard }}>
+            <p style={{ fontSize: '12px', color: '#94a3b8', marginBottom: '4px' }}>Live signal</p>
+            <p style={{ color: '#cbd5e1', fontSize: '12px', lineHeight: 1.5 }}>{xaiDisplay.signal}</p>
+          </div>
+        </div>
+        </>
         )}
 
         {userRole === 'analyst' && (
