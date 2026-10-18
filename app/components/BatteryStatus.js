@@ -71,12 +71,12 @@ export default function BatteryStatus() {
           unit="Ah"
           icon="🔌"
           status={soc > 50 ? 'safe' : 'warning'}
-          subtext="Out of 60Ah total"
+          subtext="Out of 30.9Ah total"
         />
 
         <StatCard
           title="Energy"
-          value={(soc / 100 * 60 * 63.5).toFixed(0)}
+          value={(soc / 100 * 30.9 * 63.5).toFixed(0)}
           unit="Wh"
           icon="⚡"
           status={soc > 50 ? 'safe' : 'warning'}

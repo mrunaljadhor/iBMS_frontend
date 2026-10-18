@@ -28,8 +28,8 @@ export async function POST(request) {
         current_soc: currentSoc,
         drive_mode: driveMode,
         estimated_range_km: dte.toFixed(2),
-        battery_capacity: '60Ah @ 63.5V',
-        consumption_rate: `${driveMode === 'SPORT' ? 250 : 150} Wh/km`,
+        battery_capacity: '30.9Ah @ 63.5V',
+        consumption_rate: `${driveMode === 'SPORT' ? 31.6 : 25.8} Wh/km`,
         timestamp: new Date().toISOString(),
       },
     };

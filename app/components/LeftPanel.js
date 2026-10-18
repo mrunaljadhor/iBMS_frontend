@@ -535,7 +535,7 @@ export default function LeftPanel({ userRole, batteryData, drivingMode, setDrivi
               <p style={{ fontSize: '48px', fontWeight: 'bold', color: '#06b6d4' }}>{dte}</p>
               <p style={{ color: '#9ca3af', fontSize: '18px' }}>km</p>
             </div>
-            <p style={{ fontSize: '12px', color: '#6b7280', marginTop: '8px' }}>Consumption: {drivingMode === 'ECO' ? '150' : '250'} Wh/km</p>
+            <p style={{ fontSize: '12px', color: '#6b7280', marginTop: '8px' }}>Consumption: {drivingMode === 'ECO' ? '25.8' : '31.6'} Wh/km</p>
             {routeDistance && (
               <div style={{ marginTop: '16px', borderTop: '1px solid rgba(71, 85, 105, 0.5)', paddingTop: '16px' }}>
                 <p style={{ fontSize: '12px', color: '#9ca3af', marginBottom: '8px' }}>Route Distance: <span style={{ color: getStatusColor(dteStatus), fontWeight: 'bold' }}>{routeDistance} km</span></p>

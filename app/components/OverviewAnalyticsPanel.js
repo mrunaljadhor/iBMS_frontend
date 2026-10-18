@@ -246,7 +246,7 @@ export default function OverviewAnalyticsPanel({
 
   const efficiencyData = [
     { name: 'Range (km)', ECO: Math.round((socSlider / 100) * 76), SPORT: Math.round((socSlider / 100) * 62) },
-    { name: 'Consump (Wh/km)', ECO: 150, SPORT: 250 }
+    { name: 'Consump (Wh/km)', ECO: 25.8, SPORT: 31.6 }
   ];
 
   const rulComparisonData = [

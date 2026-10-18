@@ -3,10 +3,10 @@ import { NextResponse } from 'next/server';
 const BACKEND_API_URL = (process.env.BACKEND_API_URL || process.env.NEXT_PUBLIC_API_URL || '').replace(/\/$/, '');
 
 const BATTERY = {
-  nominalCapacityAh: 60,
+  nominalCapacityAh: 30.9,
   nominalVoltageV: 63.5,
-  ecoConsumptionWhPerKm: 150,
-  sportConsumptionWhPerKm: 250,
+  ecoConsumptionWhPerKm: 25.8,
+  sportConsumptionWhPerKm: 31.6,
 };
 
 const SAMPLE_FLEET = [
@@ -29,6 +29,12 @@ function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
 }
 
+// Same road-load model as backend/server.js: F(v) = m*g*Crr + 0.5*rho*CdA*v^2 + P_aux/v
+function roadLoadPerKm(speedKmh) {
+  const v = Math.max(5, speedKmh) / 3.6;
+  return 155 * 9.81 * 0.012 + 0.5 * 1.2 * 0.5 * v * v + 40 / v;
+}
+
 function calculateDTE(currentSoc, driveMode = 'ECO', env = {}) {
   const {
     baseSoh = 100,
@@ -45,7 +51,7 @@ function calculateDTE(currentSoc, driveMode = 'ECO', env = {}) {
   const baseConsumption = driveMode === 'SPORT' ? BATTERY.sportConsumptionWhPerKm : BATTERY.ecoConsumptionWhPerKm;
   
   const tempPenalty = 1 + Math.max(0, ambientTempDeltaC * 0.005);
-  const speedFactor = Math.max(0.5, (avgSpeedKmh / 60.0) ** 2);
+  const speedFactor = roadLoadPerKm(avgSpeedKmh) / roadLoadPerKm(60);
   const accelPenalty = 1 + (accelAggressionPct / 100) * 0.2;
   const elevationPenalty = 1 + (elevationGrade > 0 ? elevationGrade * 0.12 : elevationGrade * 0.05);
 
@@ -426,8 +432,8 @@ function localDigitalTwin(body = {}) {
   const speedFactor = Math.max(0.5, (avgSpeedKmh / 60.0) ** 2);
   const accelFactor = 1.0 + (accelAggressionPct / 100.0) * 0.5;
   const regenBonus = 1.0 - (brakingAggressionPct / 100.0) * 0.2; // aggressive braking increases regen, reducing consumption
-  const nominalConsumption = 150 * (1 + loadIncreasePct / 100.0);
-  const scenarioConsumption = 150 * speedFactor * accelFactor * regenBonus * (1 + loadIncreasePct / 100.0);
+  const nominalConsumption = BATTERY.ecoConsumptionWhPerKm * (1 + loadIncreasePct / 100.0);
+  const scenarioConsumption = BATTERY.ecoConsumptionWhPerKm * speedFactor * accelFactor * regenBonus * (1 + loadIncreasePct / 100.0);
   
   const scenarioDte = (finalScenarioSoh / 100) * BATTERY.nominalVoltageV * BATTERY.nominalCapacityAh / scenarioConsumption;
   const baselineDte = (baseSoh / 100) * BATTERY.nominalVoltageV * BATTERY.nominalCapacityAh / nominalConsumption;

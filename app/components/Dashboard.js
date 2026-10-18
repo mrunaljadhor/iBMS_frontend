@@ -69,7 +69,7 @@ export default function Dashboard() {
           unit=""
           icon="🔋"
           status={stats.soc > 50 ? 'safe' : stats.soc > 20 ? 'warning' : 'critical'}
-          subtext={`${(stats.soc / 100 * 60).toFixed(1)}Ah / 60Ah`}
+          subtext={`${(stats.soc / 100 * 30.9).toFixed(1)}Ah / 30.9Ah`}
         />
         
         <StatCard 
