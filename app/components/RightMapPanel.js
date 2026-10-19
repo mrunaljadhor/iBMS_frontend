@@ -931,8 +931,9 @@ export default function RightMapPanel({
   const healthMetrics = calculateBatteryHealthMetrics({
     soc: getNumeric(socSlider, batteryData?.Actual_SOC, batteryData?.SOC, 0),
     temperatureC: getNumeric(batteryData?.Max_Temp_C, batteryData?.temperature, 25),
+    // Same inputs as LeftPanel/OverviewAnalyticsPanel, so the SOH sent to AMSA equals the SOH on screen.
     voltageDiffV: getNumeric(
-      Math.max(Number(batteryData?.Volt_Diff_V || 0), Math.min(0.6, estimatedVoltDiff)),
+      batteryData?.Volt_Diff_V,
       batteryData?.voltage_diff,
       batteryData?.volt_diff,
       estimatedVoltDiff,
