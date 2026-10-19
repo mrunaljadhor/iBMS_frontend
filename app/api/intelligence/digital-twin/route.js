@@ -61,7 +61,8 @@ Write a 1-sentence analytical insight (max 20 words) explaining the primary caus
           model: 'gemini-2.5-flash',
           contents: [{ role: 'user', parts: [{ text: prompt }] }],
           config: {
-              maxOutputTokens: 50,
+              maxOutputTokens: 60,
+              thinkingConfig: { thinkingBudget: 0 },
           }
       });
       if (response.text) {

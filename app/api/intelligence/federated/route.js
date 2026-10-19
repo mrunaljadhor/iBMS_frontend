@@ -39,7 +39,8 @@ Write a 1-sentence technical status report (max 20 words) for Global Round ${rou
           model: 'gemini-2.5-flash',
           contents: [{ role: 'user', parts: [{ text: prompt }] }],
           config: {
-              maxOutputTokens: 50,
+              maxOutputTokens: 60,
+              thinkingConfig: { thinkingBudget: 0 },
           }
       });
       if (response.text) {

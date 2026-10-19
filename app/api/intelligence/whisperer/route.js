@@ -64,6 +64,7 @@ RISK THRESHOLDS:
             systemInstruction: systemPrompt,
             temperature: 0.4,
             maxOutputTokens: 300,
+            thinkingConfig: { thinkingBudget: 0 }, // gemini-2.5-flash otherwise spends the budget on hidden thinking
         }
     });
 

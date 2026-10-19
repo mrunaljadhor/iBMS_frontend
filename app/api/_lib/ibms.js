@@ -301,6 +301,7 @@ High temp (>35C) or low SOC (<20%) is considered risky.`;
             systemInstruction: systemPrompt,
             temperature: 0.4,
             maxOutputTokens: 250,
+            thinkingConfig: { thinkingBudget: 0 },
         }
     });
 

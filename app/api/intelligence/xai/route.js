@@ -122,7 +122,7 @@ Focus on what the operator should act on first. Do not exceed 2 sentences.`;
       const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
         contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        config: { maxOutputTokens: 80 }
+        config: { maxOutputTokens: 120, thinkingConfig: { thinkingBudget: 0 } }
       });
       if (response.text) narrative = response.text.trim();
     } catch {
