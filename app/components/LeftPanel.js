@@ -12,11 +12,15 @@ const DRIVING_LEVELS = [
   { id: 'level_4', label: 'L4: Extreme', description: 'Aggressive Braking, Aggressive Accel' }
 ];
 
-export default function LeftPanel({ userRole, batteryData, drivingMode, setDrivingMode, socSlider, setSocSlider, calculateDTE, routeDistance, datasetProfile, routeInfo, operatingProfile, setOperatingProfile }) {
+export default function LeftPanel({ userRole, batteryData, drivingMode, setDrivingMode, socSlider, setSocSlider, calculateDTE, routeDistance, datasetProfile, routeInfo, operatingProfile, setOperatingProfile, amsa, riskAware = false, socMargin = 0 }) {
   const dte = calculateDTE();
-  const AMAS_SPORT_LOCK_SOC_THRESHOLD = 40;
-  const isSportLocked = socSlider < AMAS_SPORT_LOCK_SOC_THRESHOLD;
-  const shouldRecommendEco = socSlider >= AMAS_SPORT_LOCK_SOC_THRESHOLD && drivingMode === 'SPORT';
+  const AMSA_SPORT_LOCK_SOC_THRESHOLD = 40;
+  const amsaAction = amsa?.amsa_decision?.action;
+  const amsaFromBackend = Boolean(amsa) && amsa.source !== 'local-fallback';
+  const isRouteEcoLocked = amsaAction === 'FORCE_ECO_MODE' || amsaAction === 'CHARGE_REQUIRED';
+  const isSocSportLocked = socSlider < AMSA_SPORT_LOCK_SOC_THRESHOLD;
+  const isSportLocked = isSocSportLocked || isRouteEcoLocked;
+  const shouldRecommendEco = !isSportLocked && drivingMode === 'SPORT';
 
   const getNumeric = (...values) => {
     for (const value of values) {
@@ -32,7 +36,7 @@ export default function LeftPanel({ userRole, batteryData, drivingMode, setDrivi
   const calculateBatteryParams = (soc) => {
     // Trinity EV uses lower voltage system (48-72V range typically)
     // Dataset shows voltage range: 38V (depleted) to 63V (full)
-    
+
     // Voltage curve: Non-linear LiPo discharge curve
     // Maps SOC% to actual voltage (38V min, 63V max)
     let voltage;
@@ -43,29 +47,29 @@ export default function LeftPanel({ userRole, batteryData, drivingMode, setDrivi
     } else if (soc >= 50) {
       voltage = 55 + (soc - 50) * 0.12; // Middle range (linear decline)
     } else if (soc >= 20) {
-      voltage = 48 + (soc - 20) * 0.175; // Lower range 
+      voltage = 48 + (soc - 20) * 0.175; // Lower range
     } else if (soc >= 5) {
       voltage = 40 + (soc - 5) * 1.6; // Rapid drop at critical levels
     } else {
       voltage = 38; // Minimum safe voltage
     }
-    
+
     // Current correlates with driving mode and power demand
     // Dataset shows: ECO mode ~0.3-0.65A, SPORT mode ~1.0-1.8A
     const baseCurrentEco = 0.3 + (100 - soc) * 0.003; // Slight increase at low SOC
     const baseCurrentSport = 1.2 + (100 - soc) * 0.006;
     const current = drivingMode === 'SPORT' ? baseCurrentSport : baseCurrentEco;
-    
+
     // Power output = Voltage × Current (in kW)
     const power = (voltage * current) / 1000;
-    
+
     // Temperature: Base 25°C + heat from power + stress at low SOC
     // Dataset shows range of 25-30°C
     const baseTemp = 25;
     const powerTemp = power * 3; // Power generates moderate heat
     const socStress = (100 - soc) * 0.04; // Stress increases significantly at low SOC
     const temperature = Math.min(32, baseTemp + powerTemp + socStress);
-    
+
     // Voltage differential (cell imbalance)
     // Dataset shows range: 0.001V to 0.6V
     // Increases at extreme SOC levels (very high or very low)
@@ -77,7 +81,7 @@ export default function LeftPanel({ userRole, batteryData, drivingMode, setDrivi
     } else {
       voltDiff = 0.01 + Math.abs(soc - 50) * 0.0015;
     }
-    
+
     return {
       voltage: Math.max(38, Math.min(63.5, voltage)),
       current: Math.max(0.1, Math.min(1.8, current)),
@@ -91,9 +95,18 @@ export default function LeftPanel({ userRole, batteryData, drivingMode, setDrivi
 
   // Correlate feasibility with actual route distance
   const socAdjustedDistance = routeInfo?.socAdjustedDistance || routeDistance;
-  const dteStatus = routeDistance && dte > (socAdjustedDistance * 1.1) ? 'safe' : 
-                   routeDistance && dte >= (socAdjustedDistance * 0.8) ? 'critical' : 
-                   'impossible';
+  // With a calculated route, the status is the backend AMSA decision (route-aware ECO/SPORT DTE).
+  // Without one, a rough flat-road check is shown and labelled as an estimate.
+  const AMSA_STATUS = { SAFE: 'safe', CRITICAL: 'critical', IMPOSSIBLE: 'impossible' };
+  const amsaStatus = amsa ? AMSA_STATUS[amsa.feasibility?.status] : undefined;
+  const dteStatus = amsaStatus || (routeDistance && dte > (socAdjustedDistance * 1.1) ? 'safe' :
+                   routeDistance && dte >= (socAdjustedDistance * 0.8) ? 'critical' :
+                   'impossible');
+  const ecoDte = amsa?.feasibility?.eco_dte;
+  const sportDte = amsa?.feasibility?.sport_dte;
+  const routeAwareDte = amsa ? (drivingMode === 'SPORT' ? sportDte : ecoDte) : undefined;
+  const amsaRouteKm = amsa ? Number(amsa.route_distance_km) : undefined;
+  const physics = amsa?.physics_metrics;
 
   const trafficSeverityLabel = (severity) => {
     switch (severity) {
@@ -186,10 +199,10 @@ export default function LeftPanel({ userRole, batteryData, drivingMode, setDrivi
   });
 
   const soh = healthMetrics.soh;
-  
+
   const [customEol, setCustomEol] = useState(null);
   const activeEol = customEol ?? healthMetrics.eolThreshold;
-  
+
   const dynamicRul = Math.max(0, (soh - activeEol) / healthMetrics.yearlyDegradation);
   const bestCaseRul = Math.max(0, (soh - activeEol) / (healthMetrics.yearlyDegradation * 0.85));
   const worstCaseRul = Math.max(0, (soh - activeEol) / (healthMetrics.yearlyDegradation * 1.15));
@@ -199,7 +212,7 @@ export default function LeftPanel({ userRole, batteryData, drivingMode, setDrivi
   const tempPenalty = healthMetrics.tempPenalty || 0;
   const imbalancePenalty = healthMetrics.imbalancePenalty || 0;
   const baseSoh = soh + cycleFade + calendarFade + tempPenalty + imbalancePenalty;
-  
+
   const donutData = [
     { name: 'Cycle Wear', value: cycleFade, color: '#f97316' },
     { name: 'Calendar Aging', value: calendarFade, color: '#a855f7' },
@@ -227,7 +240,7 @@ export default function LeftPanel({ userRole, batteryData, drivingMode, setDrivi
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-      
+
       {/* Side-by-Side Grid for Status and SOC */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
         {/* BATTERY STATUS */}
@@ -498,7 +511,9 @@ export default function LeftPanel({ userRole, batteryData, drivingMode, setDrivi
             fontSize: '12px',
             fontWeight: '600'
           }}>
-            AMAS LOCK: SOC {socSlider.toFixed(1)}% is below {AMAS_SPORT_LOCK_SOC_THRESHOLD}%. SPORT is disabled and ECO is enforced.
+            {isRouteEcoLocked
+              ? `AMSA ECO-LOCK: SPORT range (${sportDte.toFixed(1)} km) is shorter than the route (${amsaRouteKm.toFixed(1)} km). SPORT is disabled and ECO is enforced.`
+              : `AMSA LOCK: SOC ${socSlider.toFixed(1)}% is below ${AMSA_SPORT_LOCK_SOC_THRESHOLD}%. SPORT is disabled and ECO is enforced.`}
           </div>
         )}
 
@@ -513,7 +528,7 @@ export default function LeftPanel({ userRole, batteryData, drivingMode, setDrivi
             fontSize: '12px',
             fontWeight: '600'
           }}>
-            AMAS RECOMMENDATION: SOC {socSlider.toFixed(1)}% - switch to ECO for better range. SPORT is still allowed until SOC goes below {AMAS_SPORT_LOCK_SOC_THRESHOLD}%.
+            AMSA RECOMMENDATION: SOC {socSlider.toFixed(1)}% - switch to ECO for better range. SPORT is still allowed until SOC goes below {AMSA_SPORT_LOCK_SOC_THRESHOLD}% or the route needs ECO.
           </div>
         )}
       </div>
@@ -521,7 +536,7 @@ export default function LeftPanel({ userRole, batteryData, drivingMode, setDrivi
       {/* DTE Display & Charging Recommendation */}
       {userRole !== 'analyst' && (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-          
+
           {/* DTE Display */}
           <div style={{
             background: 'linear-gradient(160deg, rgba(7, 10, 14, 0.95) 0%, rgba(2, 4, 8, 0.95) 100%)',
@@ -530,18 +545,36 @@ export default function LeftPanel({ userRole, batteryData, drivingMode, setDrivi
             padding: '24px',
             textAlign: 'center'
           }}>
-            <p style={{ fontSize: '12px', fontWeight: 'bold', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '12px' }}>Distance to Empty</p>
+            <p style={{ fontSize: '12px', fontWeight: 'bold', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '12px' }}>
+              {amsa ? `Distance to Empty (route-aware, ${drivingMode})` : 'Distance to Empty (flat road)'}
+            </p>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: '12px', justifyContent: 'center' }}>
-              <p style={{ fontSize: '48px', fontWeight: 'bold', color: '#06b6d4' }}>{dte}</p>
+              <p style={{ fontSize: '48px', fontWeight: 'bold', color: '#06b6d4' }}>{amsa ? routeAwareDte.toFixed(1) : dte}</p>
               <p style={{ color: '#9ca3af', fontSize: '18px' }}>km</p>
             </div>
-            <p style={{ fontSize: '12px', color: '#6b7280', marginTop: '8px' }}>Consumption: {drivingMode === 'ECO' ? '25.8' : '31.6'} Wh/km</p>
+            {amsa ? (
+              <p style={{ fontSize: '12px', color: '#6b7280', marginTop: '8px' }}>
+                ECO {ecoDte.toFixed(1)} km · SPORT {sportDte.toFixed(1)} km · flat-road estimate {dte} km
+              </p>
+            ) : (
+              <p style={{ fontSize: '12px', color: '#6b7280', marginTop: '8px' }}>Consumption: {drivingMode === 'ECO' ? '25.8' : '31.6'} Wh/km · plan a route for the AMSA check</p>
+            )}
             {routeDistance && (
               <div style={{ marginTop: '16px', borderTop: '1px solid rgba(71, 85, 105, 0.5)', paddingTop: '16px' }}>
-                <p style={{ fontSize: '12px', color: '#9ca3af', marginBottom: '8px' }}>Route Distance: <span style={{ color: getStatusColor(dteStatus), fontWeight: 'bold' }}>{routeDistance} km</span></p>
+                <p style={{ fontSize: '12px', color: '#9ca3af', marginBottom: '8px' }}>Route Distance: <span style={{ color: getStatusColor(dteStatus), fontWeight: 'bold' }}>{amsa ? amsaRouteKm.toFixed(1) : routeDistance} km</span></p>
                 <p style={{ fontSize: '14px', fontWeight: 'bold', color: getStatusColor(dteStatus) }}>
-                  {dteStatus === 'safe' ? 'SAFE - Sufficient for journey' : dteStatus === 'critical' ? 'CRITICAL - Consider charging' : 'IMPOSSIBLE - Charging required'}
+                  {amsa
+                    ? (dteStatus === 'safe' ? 'SAFE - ECO and SPORT both reach the destination' : dteStatus === 'critical' ? 'CRITICAL - ECO-Lock: only ECO reaches the destination' : 'IMPOSSIBLE - Charge before departure')
+                    : (dteStatus === 'safe' ? 'SAFE (estimate) - Sufficient for journey' : dteStatus === 'critical' ? 'CRITICAL (estimate) - Consider charging' : 'IMPOSSIBLE (estimate) - Charging required')}
                 </p>
+                {amsa && riskAware && (
+                  <p style={{ fontSize: '11px', color: '#fcd34d', marginTop: '6px' }}>
+                    Risk-aware: decided at SOC {Number(amsa.decision_soc).toFixed(1)} % (estimate {socSlider} % − {Number(socMargin).toFixed(1)})
+                  </p>
+                )}
+                {amsa && !amsaFromBackend && (
+                  <p style={{ fontSize: '11px', color: '#fcd34d', marginTop: '6px' }}>Offline estimate – backend not reachable</p>
+                )}
               </div>
             )}
           </div>
@@ -564,18 +597,29 @@ export default function LeftPanel({ userRole, batteryData, drivingMode, setDrivi
                 </span>
               </div>
               <p style={{ fontSize: '13px', color: '#d1d5db', lineHeight: 1.5 }}>
-                {dteStatus === 'safe'
-                  ? 'Battery level is sufficient for the trip under current traffic.'
-                  : dteStatus === 'critical'
-                    ? 'Traffic load reduces margin. Charging before departure is recommended.'
-                    : 'Immediate charging is required for this route under live traffic.'}
+                {amsa
+                  ? (amsaAction === 'MANUAL_MODE'
+                    ? `Both modes reach the destination (ECO margin ${amsa.feasibility.safety_margin_eco.toFixed(1)} km). No charging needed.`
+                    : amsaAction === 'FORCE_ECO_MODE'
+                      ? `Ride in ECO: it arrives with ${amsa.feasibility.safety_margin_eco.toFixed(1)} km to spare, SPORT would fall ${Math.abs(amsa.feasibility.safety_margin_sport).toFixed(1)} km short. Charge first for more margin.`
+                      : `Charge before departure: even ECO falls ${Math.abs(amsa.feasibility.safety_margin_eco).toFixed(1)} km short of the destination.`)
+                  : dteStatus === 'safe'
+                    ? 'Battery level looks sufficient (flat-road estimate). Calculate the route for the AMSA check.'
+                    : dteStatus === 'critical'
+                      ? 'Margin is small (flat-road estimate). Calculate the route for the AMSA check.'
+                      : 'Charging is likely required (flat-road estimate). Calculate the route for the AMSA check.'}
               </p>
             </div>
-            
+
             <div style={{ marginTop: '16px', padding: '12px', backgroundColor: 'rgba(51, 65, 85, 0.4)', borderRadius: '8px' }}>
               <p style={{ fontSize: '12px', color: '#9ca3af' }}>
                 Current SOC: <span style={{ color: '#60a5fa', fontWeight: 'bold' }}>{socSlider.toFixed(1)}%</span>
               </p>
+              {amsa && (
+                <p style={{ fontSize: '12px', color: '#9ca3af', marginTop: '8px' }}>
+                  AMSA action: <span style={{ color: getStatusColor(dteStatus), fontWeight: 'bold' }}>{amsaAction}</span>
+                </p>
+              )}
               <p style={{ fontSize: '12px', color: '#9ca3af', marginTop: '8px' }}>
                 Congestion Ratio: <span style={{ color: routeInfo?.congestionRatio > 1.2 ? '#ef4444' : routeInfo?.congestionRatio > 1.05 ? '#f59e0b' : '#22c55e', fontWeight: 'bold' }}>{routeInfo?.congestionRatio || 1}x</span>
               </p>
@@ -605,9 +649,9 @@ export default function LeftPanel({ userRole, batteryData, drivingMode, setDrivi
               <div style={{ position: 'relative', width: '120px', height: '120px', flexShrink: 0 }}>
                 <svg width="120" height="120" viewBox="0 0 120 120">
                   <circle cx="60" cy="60" r="54" fill="none" stroke="rgba(55, 65, 81, 0.5)" strokeWidth="8" />
-                  <circle 
-                    cx="60" cy="60" r="54" fill="none" 
-                    stroke={getSOHColor(soh)} strokeWidth="8" 
+                  <circle
+                    cx="60" cy="60" r="54" fill="none"
+                    stroke={getSOHColor(soh)} strokeWidth="8"
                     strokeDasharray={`${(soh / 100) * 339.292} 339.292`}
                     strokeDashoffset="0"
                     strokeLinecap="round"
@@ -643,7 +687,7 @@ export default function LeftPanel({ userRole, batteryData, drivingMode, setDrivi
                         <Cell key={`cell-${index}`} fill={entry.color} style={{ filter: `drop-shadow(0 0 4px ${entry.color}80)` }} />
                       ))}
                     </Pie>
-                    <Tooltip 
+                    <Tooltip
                       formatter={(value) => [`${value.toFixed(1)}%`, 'Impact']}
                       contentStyle={{ backgroundColor: 'rgba(2, 6, 23, 0.9)', border: '1px solid rgba(148, 163, 184, 0.2)', borderRadius: '8px', fontSize: '12px', color: '#f8fafc' }}
                       itemStyle={{ color: '#f8fafc' }}
@@ -770,10 +814,12 @@ export default function LeftPanel({ userRole, batteryData, drivingMode, setDrivi
               <span style={{ fontSize: '11px', color: '#22c55e', letterSpacing: '0.1em', textTransform: 'uppercase', border: '1px solid rgba(34, 197, 94, 0.45)', borderRadius: '9999px', padding: '4px 10px' }}>Range</span>
             </div>
             <p style={{ fontSize: '14px', color: '#d1d5db', marginBottom: '12px' }}>
-              Current driving range with {drivingMode} mode (SOC: {socSlider}%)
+              {amsa
+                ? `Route-aware range in ${drivingMode} mode (SOC: ${socSlider}%; flat-road estimate ${dte} km)`
+                : `Current driving range with ${drivingMode} mode (SOC: ${socSlider}%, flat road)`}
             </p>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: '32px', fontWeight: 'bold', color: '#06b6d4' }}>{dte}km</span>
+              <span style={{ fontSize: '32px', fontWeight: 'bold', color: '#06b6d4' }}>{amsa ? routeAwareDte.toFixed(1) : dte}km</span>
               <span style={{ fontSize: '12px', color: '#9ca3af' }}>Available range</span>
             </div>
           </div>
@@ -860,6 +906,18 @@ export default function LeftPanel({ userRole, batteryData, drivingMode, setDrivi
                   {routeInfo.routeProvider || 'n/a'}
                 </span>
               </div>
+              {amsa && [
+                ['AMSA route (backend)', `${amsaRouteKm.toFixed(1)} km`],
+                ['Climb / descent', physics ? `${physics.uphill_climb_meters.toFixed(0)} m / ${physics.downhill_descent_meters.toFixed(0)} m` : 'n/a'],
+                ['Traffic jam ratio J', physics ? physics.traffic_jam_ratio.toFixed(3) : 'n/a'],
+                ['ECO / SPORT range', `${ecoDte.toFixed(1)} / ${sportDte.toFixed(1)} km`],
+                ['AMSA action', amsaAction]
+              ].map(([label, value]) => (
+                <div key={label} style={{ display: 'flex', justifyContent: 'space-between', padding: '12px', backgroundColor: 'rgba(51, 65, 85, 0.4)', borderRadius: '8px' }}>
+                  <span style={{ color: '#9ca3af', fontSize: '13px' }}>{label}</span>
+                  <span style={{ color: '#38bdf8', fontWeight: 'bold', fontSize: '12px' }}>{value}</span>
+                </div>
+              ))}
               <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px', backgroundColor: 'rgba(51, 65, 85, 0.4)', borderRadius: '8px' }}>
                 <span style={{ color: '#9ca3af', fontSize: '13px' }}>Feasibility</span>
                 <span style={{ color: getStatusColor(dteStatus), fontWeight: 'bold', textTransform: 'uppercase', fontSize: '12px' }}>

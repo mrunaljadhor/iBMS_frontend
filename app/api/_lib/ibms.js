@@ -172,7 +172,8 @@ function localRouteDistance(body = {}) {
 }
 
 function localFeasibility(body = {}) {
-  const currentSoc = Number(body.current_soc ?? 100);
+  const socMargin = Math.max(0, Number(body.soc_uncertainty_pct) || 0);
+  const currentSoc = Math.max(0, Number(body.current_soc ?? 100) - socMargin);
   const routeResult = localRouteDistance(body);
   const totalDistance = Number(routeResult.distance_km);
   const legs = routeResult.legs;
@@ -221,6 +222,10 @@ function localFeasibility(body = {}) {
   }
 
   return {
+    source: 'local-fallback',
+    current_soc: Number(body.current_soc ?? 100),
+    soc_uncertainty_pct: socMargin,
+    decision_soc: Number(currentSoc.toFixed(2)),
     route_distance_km: Number(totalDistance.toFixed(2)),
     feasibility: {
       status: overallStatus,
@@ -234,15 +239,16 @@ function localFeasibility(body = {}) {
       recommendation,
       alert,
     },
+    // No routing, traffic or elevation offline: straight-line distance on a flat road.
     physics_metrics: {
-      uphill_climb_meters: 145.20,
-      downhill_descent_meters: 80.50,
-      uphill_grade_pct: 1.25,
-      downhill_grade_pct: 0.70,
-      traffic_jam_ratio: 0.35,
-      regen_efficiency: 0.67,
-      downhill_bonus_pct: 3.75,
-      torque_penalty_pct: 15.40
+      uphill_climb_meters: 0,
+      downhill_descent_meters: 0,
+      uphill_grade_pct: 0,
+      downhill_grade_pct: 0,
+      traffic_jam_ratio: 0,
+      regen_efficiency: 0.6,
+      downhill_bonus_pct: 0,
+      torque_penalty_pct: 0
     }
   };
 }

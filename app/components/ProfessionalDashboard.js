@@ -82,10 +82,10 @@ export default function ProfessionalDashboard() {
   const [batteryData, setBatteryData] = useState({
     Voltage_V: 58.98,
     Current_A: 0.39,
-    Max_Temp_C: 25.0,
+    Max_Temp_C: defaultVehicleProfile.nominalTemperatureC,
     Actual_SOC: 41.7,
     Power_KW: 0.023,
-    Volt_Diff_V: 0.083,
+    Volt_Diff_V: defaultVehicleProfile.nominalVoltDiffV,
     Drive_Mode: 'ECO',
     Dataset_Name: defaultVehicleProfile.datasetName,
     Dataset_Rows: defaultVehicleProfile.rows,
@@ -115,6 +115,11 @@ export default function ProfessionalDashboard() {
   const [updateRoute, setUpdateRoute] = useState(false);
   const [userRole, setUserRole] = useState('user'); // 'user' or 'analyst'
   const [routeInfo, setRouteInfo] = useState(null);
+  // Route-aware AMSA result from /api/feasibility (backend), and the risk-aware settings.
+  // 7.8 points = mean calibrated lower margin (mu - SOC_lb) measured offline on CALCE (Exp 10).
+  const [amsa, setAmsa] = useState(null);
+  const [riskAware, setRiskAware] = useState(false);
+  const [socMargin, setSocMargin] = useState(7.8);
 
   const applyDatasetProfile = (profile) => {
     setActiveDatasetProfile(profile);
@@ -229,6 +234,19 @@ export default function ProfessionalDashboard() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [socSlider, drivingMode, operatingProfile, routeDistance]);
+
+  // ECO-Lock: when the route-aware AMSA says SPORT cannot reach the destination, SPORT is not allowed.
+  useEffect(() => {
+    const action = amsa?.amsa_decision?.action;
+    if ((action === 'FORCE_ECO_MODE' || action === 'CHARGE_REQUIRED') && drivingMode === 'SPORT') {
+      setDrivingMode('ECO');
+      const f = amsa.feasibility;
+      setAmsaAlert(`AMSA ECO-LOCK ENGAGED: SPORT range ${f.sport_dte.toFixed(1)} km is shorter than the ${Number(amsa.route_distance_km).toFixed(1)} km route. ECO mode enforced.`);
+      const timer = setTimeout(() => setAmsaAlert(null), 8000);
+      return () => clearTimeout(timer);
+    }
+    return undefined;
+  }, [amsa, drivingMode]);
 
   // Route distance is now traffic-aware and updated by RightMapPanel.
   // Keep the shared state here so other panels can consume the adjusted distance.
@@ -460,6 +478,9 @@ export default function ProfessionalDashboard() {
               routeInfo={routeInfo}
               operatingProfile={operatingProfile}
               setOperatingProfile={setOperatingProfile}
+              amsa={amsa}
+              riskAware={riskAware}
+              socMargin={socMargin}
             />
           </div>
 
@@ -479,6 +500,10 @@ export default function ProfessionalDashboard() {
                 socSlider={socSlider}
                 datasetProfile={activeDatasetProfile}
                 onRouteInfoUpdate={setRouteInfo}
+                riskAware={riskAware}
+                socMargin={socMargin}
+                onAmsaUpdate={setAmsa}
+                onRiskAwareChange={setRiskAware}
               />
             ) : (
               <AdvancedIntelligenceSuite
@@ -489,6 +514,11 @@ export default function ProfessionalDashboard() {
                 routeDistance={routeDistance}
                 calculateDTE={calculateDTE}
                 datasetProfile={activeDatasetProfile}
+                amsa={amsa}
+                riskAware={riskAware}
+                setRiskAware={setRiskAware}
+                socMargin={socMargin}
+                setSocMargin={setSocMargin}
               />
             )}
           </div>
@@ -503,6 +533,11 @@ export default function ProfessionalDashboard() {
             routeDistance={routeDistance}
             calculateDTE={calculateDTE}
             datasetProfile={activeDatasetProfile}
+            amsa={amsa}
+            riskAware={riskAware}
+            setRiskAware={setRiskAware}
+            socMargin={socMargin}
+            setSocMargin={setSocMargin}
           />
         )}
       </div>

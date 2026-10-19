@@ -192,13 +192,16 @@ export default function AdvancedIntelligenceSuite({
   socSlider,
   routeDistance,
   calculateDTE,
-  datasetProfile
+  datasetProfile,
+  amsa,
+  riskAware = false,
+  setRiskAware,
+  socMargin = 7.8,
+  setSocMargin
 }) {
   const [question, setQuestion] = useState('');
   const [messages, setMessages] = useState([]);
   const [xaiTarget, setXaiTarget] = useState('SoH');
-  const [edgeClients, setEdgeClients] = useState(6);
-  const [federatedRound, setFederatedRound] = useState(3);
   const [payloadWeightKg, setPayloadWeightKg] = useState(0);
   const [ambientTempDeltaC, setAmbientTempDeltaC] = useState(6);
   const [terrainGradientPct, setTerrainGradientPct] = useState(0);
@@ -207,7 +210,7 @@ export default function AdvancedIntelligenceSuite({
   const [accelAggressionPct, setAccelAggressionPct] = useState(10);
   const [brakingAggressionPct, setBrakingAggressionPct] = useState(10);
   const [twinDistance, setTwinDistance] = useState(routeDistance || 25);
-  const [remoteAnalytics, setRemoteAnalytics] = useState({ whisperer: null, xai: null, federated: null, twin: null });
+  const [remoteAnalytics, setRemoteAnalytics] = useState({ whisperer: null, xai: null });
 
   const liveTemperature = Number(batteryData?.Max_Temp_C || batteryData?.temperature || 25);
   const liveVoltDiff = Number(batteryData?.Volt_Diff_V || batteryData?.voltage_diff || 0.05);
@@ -269,22 +272,6 @@ export default function AdvancedIntelligenceSuite({
   ].sort((a, b) => a.impact - b.impact);
 
 
-  const federatedNodes = Array.from({ length: edgeClients }, (_, index) => {
-    const nodeLoss = clamp(0.8 - (federatedRound * 0.04) - (index * 0.03), 0.12, 0.82);
-    const nodeAccuracy = clamp(91.8 + (federatedRound * 0.72) + (index * 0.18), 90, 98.9);
-
-    return {
-      id: `edge-${index + 1}`,
-      loss: Number(nodeLoss.toFixed(2)),
-      accuracy: Number(nodeAccuracy.toFixed(1)),
-      uplinkKb: Number((240 + (index * 18)).toFixed(0))
-    };
-  });
-
-  const federatedBandwidth = edgeClients * 185;
-  const federatedWeights = edgeClients * 9;
-  const bandwidthSavings = Math.max(0, Math.round(100 - ((federatedWeights / federatedBandwidth) * 100)));
-
   const whispererResponse = remoteAnalytics.whisperer || buildWhispererAnswer(question, {
     socSlider,
     routeDistance,
@@ -313,32 +300,14 @@ export default function AdvancedIntelligenceSuite({
         signal:    xai.signal
       };
 
-  const federatedDisplay = remoteAnalytics.federated || {
-    round: federatedRound,
-    edge_nodes: edgeClients,
-    clients: federatedNodes,
-    global_accuracy: Number((91.8 + federatedRound * 0.6).toFixed(1)),
-    bandwidth_saved_pct: bandwidthSavings
-  };
+  const displayRul = projectedRul;
+  const displayDte = projectedDte;
+  const twinCurve = twinData;
 
-  const twinDisplay = remoteAnalytics.twin || {
-    curve: twinData,
-    projected_dte: projectedDte,
-    summary: {
-      baseSoh: baseSoH,
-      payloadWeightKg,
-      terrainGradientPct,
-      fastChargeFreqPct,
-      ambientTempDeltaC,
-      avgSpeedKmh,
-      accelAggressionPct,
-      brakingAggressionPct
-    }
-  };
-
-  const displayRul = twinDisplay.curve?.[twinDisplay.curve.length - 1]?.projectedRul ?? projectedRul;
-  const displayDte = twinDisplay.projected_dte ?? projectedDte;
-  const twinCurve = twinDisplay.curve || twinData;
+  // SOC uncertainty (risk-aware AMSA). The margin mu - SOC_lb comes from offline calibration on CALCE (Exp 10);
+  // a live sigma needs the on-vehicle LSTM, so the margin is a setting here.
+  const socEstimate = Number(socSlider) || 0;
+  const socLowerBound = Math.max(0, socEstimate - (Number(socMargin) || 0));
 
   useEffect(() => {
     let cancelled = false;
@@ -346,7 +315,7 @@ export default function AdvancedIntelligenceSuite({
     const timer = setTimeout(() => {
       const syncAnalytics = async () => {
         try {
-          const [xaiResult, federatedResult, twinResult] = await Promise.all([
+          const [xaiResult] = await Promise.all([
             postJson('/api/intelligence/xai', {
               voltage:     Number(batteryData?.Voltage_V  || batteryData?.Voltage  || 63.5),
               current:     Number(batteryData?.Current_A  || batteryData?.Current  || 0),
@@ -356,29 +325,12 @@ export default function AdvancedIntelligenceSuite({
               soc:         socSlider,
               drivingMode: drivingMode || 'ECO',
             }).catch(e => { console.error('XAI API error:', e); return null; }),
-            postJson('/api/intelligence/federated', {
-              rounds: federatedRound,
-              edgeNodes: edgeClients
-            }).catch(e => { console.error('Federated API error:', e); return null; }),
-            postJson('/api/intelligence/digital-twin', {
-              baseSoh: baseSoH,
-              payloadWeightKg,
-              terrainGradientPct,
-              fastChargeFreqPct,
-              ambientTempDeltaC,
-              avgSpeedKmh,
-              accelAggressionPct,
-              brakingAggressionPct,
-              days: 7
-            }).catch(e => { console.error('Twin API error:', e); return null; })
           ]);
 
           if (!cancelled) {
             setRemoteAnalytics((current) => ({
               ...current,
-              xai: xaiResult || current.xai,
-              federated: federatedResult || current.federated,
-              twin: twinResult || null
+              xai: xaiResult || current.xai
             }));
           }
         } catch (error) {
@@ -393,7 +345,8 @@ export default function AdvancedIntelligenceSuite({
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [batteryData, baseSoH, payloadWeightKg, datasetProfile, edgeClients, federatedRound, liveTemperature, terrainGradientPct, socSlider, fastChargeFreqPct, ambientTempDeltaC, avgSpeedKmh, accelAggressionPct, brakingAggressionPct, twinDistance]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [batteryData, datasetProfile, liveTemperature, liveVoltDiff, socSlider, drivingMode]);
 
   useEffect(() => {
     if (routeDistance) {
@@ -436,21 +389,6 @@ export default function AdvancedIntelligenceSuite({
     setQuestion('');
   };
 
-  const handleRunFederatedRound = async () => {
-    const nextRound = federatedRound + 1;
-    setFederatedRound(nextRound);
-
-    try {
-      const result = await postJson('/api/intelligence/federated', {
-        rounds: nextRound,
-        edgeNodes: edgeClients
-      });
-      setRemoteAnalytics((current) => ({ ...current, federated: result }));
-    } catch (error) {
-      console.error('Federated update failed:', error);
-    }
-  };
-
   return (
     <section style={{ marginTop: '22px' }} className="slide-up">
       <div style={{ marginBottom: '16px' }}>
@@ -458,7 +396,7 @@ export default function AdvancedIntelligenceSuite({
           Intelligence Suite
         </h3>
         <p style={{ marginTop: '6px', color: '#94a3b8', fontSize: '13px' }}>
-          Conversational analytics, explainable AI, federated learning, and digital twin simulation in one place.
+          Conversational analytics, feature attribution, SOC uncertainty and a what-if simulator in one place.
         </p>
       </div>
 
@@ -468,7 +406,7 @@ export default function AdvancedIntelligenceSuite({
             <div style={suiteCard}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
                 <h4 style={{ fontSize: '15px', color: '#e2e8f0', fontWeight: 700 }}>Battery Whisperer</h4>
-                <span className="badge-info">RAG Ready</span>
+                <span className="badge-info">Gemini</span>
               </div>
 
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '12px' }}>
@@ -539,8 +477,8 @@ export default function AdvancedIntelligenceSuite({
 
         <div style={suiteCard}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
-            <h4 style={{ fontSize: '15px', color: '#e2e8f0', fontWeight: 700 }}>Explainable AI</h4>
-            <span className="badge-warning">SHAP / LIME</span>
+            <h4 style={{ fontSize: '15px', color: '#e2e8f0', fontWeight: 700 }}>Stress Attribution</h4>
+            <span className="badge-warning">Heuristic</span>
           </div>
 
           {/* Target selector tabs */}
@@ -610,6 +548,9 @@ export default function AdvancedIntelligenceSuite({
           <div style={{ marginTop: '12px', ...miniCard }}>
             <p style={{ fontSize: '11px', color: '#94a3b8', marginBottom: '4px' }}>Live signal</p>
             <p style={{ color: '#f8fafc', fontSize: '12px' }}>{xaiDisplay.signal}</p>
+            <p style={{ color: '#94a3b8', fontSize: '11px', marginTop: '8px' }}>
+              Bars are rule-based weightings of the stress terms. SHAP computed offline on the LSTM SOC model attributes 93–96 % to recent terminal voltage.
+            </p>
           </div>
         </div>
         </>
@@ -618,58 +559,88 @@ export default function AdvancedIntelligenceSuite({
         {userRole === 'analyst' && (
           <div style={suiteCard}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
-              <h4 style={{ fontSize: '15px', color: '#e2e8f0', fontWeight: 700 }}>Federated Learning</h4>
-              <span className="badge-success">Edge-Cloud</span>
+              <h4 style={{ fontSize: '15px', color: '#e2e8f0', fontWeight: 700 }}>SOC Uncertainty</h4>
+              <span className="badge-success">Calibrated</span>
             </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '10px', marginBottom: '12px' }}>
-            <div style={miniCard}>
-              <p style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Rounds</p>
-              <p style={{ fontSize: '26px', color: '#22c55e', fontWeight: 700 }}>{federatedDisplay.round || federatedRound}</p>
+            <div style={{ ...miniCard, marginBottom: '12px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#94a3b8', marginBottom: '8px' }}>
+                <span>Lower bound SOC_lb = μ − margin</span>
+                <span>Estimate μ</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '10px' }}>
+                <span style={{ fontSize: '26px', fontWeight: 700, color: '#f59e0b' }}>{socLowerBound.toFixed(1)}%</span>
+                <span style={{ fontSize: '26px', fontWeight: 700, color: '#22c55e' }}>{socEstimate.toFixed(1)}%</span>
+              </div>
+              <div style={{ position: 'relative', height: '12px', borderRadius: '999px', background: 'rgba(71, 85, 105, 0.5)' }}>
+                <div style={{
+                  position: 'absolute',
+                  left: `${socLowerBound}%`,
+                  width: `${Math.max(0, socEstimate - socLowerBound)}%`,
+                  height: '100%',
+                  borderRadius: '999px',
+                  background: 'linear-gradient(90deg, #f59e0b, #22c55e)'
+                }} />
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: '#64748b', marginTop: '4px' }}>
+                <span>0 %</span>
+                <span>100 %</span>
+              </div>
             </div>
-            <div style={miniCard}>
-              <p style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Edge nodes</p>
+
+            <div style={{ ...miniCard, marginBottom: '12px' }}>
+              <label style={{ display: 'block', marginBottom: '6px', color: '#cbd5e1', fontSize: '12px' }}>
+                Uncertainty margin (μ − SOC_lb): {Number(socMargin).toFixed(1)} points
+              </label>
               <input
                 type="range"
-                min="3"
-                max="10"
-                value={edgeClients}
-                onChange={(event) => setEdgeClients(Number(event.target.value))}
+                min="0"
+                max="20"
+                step="0.1"
+                value={socMargin}
+                onChange={(event) => setSocMargin?.(Number(event.target.value))}
                 style={{ width: '100%' }}
               />
-              <p style={{ color: '#e2e8f0', fontSize: '13px', marginTop: '4px' }}>{edgeClients} micro-models</p>
+              <p style={{ color: '#94a3b8', fontSize: '11px', marginTop: '4px' }}>
+                Default 7.8 = mean calibrated margin on CALCE (median 6.6, p95 18.0). A live margin needs the on-vehicle LSTM.
+              </p>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '10px', color: '#e2e8f0', fontSize: '12px', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={riskAware}
+                  onChange={(event) => setRiskAware?.(event.target.checked)}
+                  style={{ accentColor: '#f59e0b' }}
+                />
+                Risk-aware AMSA (decide on SOC_lb)
+              </label>
             </div>
-          </div>
 
-          <div style={{ display: 'grid', gap: '10px', marginBottom: '12px' }}>
-            {(federatedDisplay.clients || federatedNodes).slice(0, 4).map((node) => (
-              <div key={node.id} style={miniCard}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-                  <span style={{ color: '#e2e8f0', fontSize: '12px' }}>{node.id}</span>
-                  <span style={{ color: '#93c5fd', fontSize: '12px' }}>{node.accuracy}% acc</span>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '10px', marginBottom: '12px' }}>
+              {[
+                ['Raw dropout 95 % interval', '83.5 %', 'coverage'],
+                ['Conformal 95 % interval', '96.6 %', 'coverage'],
+                ['Unsafe acceptances', '0.71 → 0.007 %', 'point → lower bound'],
+                ['False refusals', '1.59 → 8.15 %', 'point → lower bound']
+              ].map(([label, value, note]) => (
+                <div key={label} style={miniCard}>
+                  <p style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</p>
+                  <p style={{ color: '#f8fafc', fontSize: '17px', fontWeight: 700 }}>{value}</p>
+                  <p style={{ color: '#64748b', fontSize: '10px' }}>{note}</p>
                 </div>
-                <div style={{ height: '8px', borderRadius: '999px', background: 'rgba(71, 85, 105, 0.5)', overflow: 'hidden', marginBottom: '6px' }}>
-                  <div style={{ width: `${(1 - node.loss) * 100}%`, height: '100%', background: 'linear-gradient(90deg, #38bdf8, #22c55e)' }} />
-                </div>
-                <p style={{ color: '#94a3b8', fontSize: '11px' }}>Local update: {node.uplinkKb} KB</p>
-              </div>
-            ))}
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '10px' }}>
-            <div style={miniCard}>
-              <p style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Bandwidth saved</p>
-              <p style={{ color: '#f8fafc', fontSize: '18px', fontWeight: 700 }}>{federatedDisplay.bandwidth_saved_pct ?? bandwidthSavings}%</p>
+              ))}
             </div>
-            <div style={miniCard}>
-              <p style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Global gain</p>
-              <p style={{ color: '#f8fafc', fontSize: '18px', fontWeight: 700 }}>{(federatedDisplay.global_accuracy ?? (91.8 + federatedRound * 0.6)).toFixed(1)}%</p>
-            </div>
-          </div>
 
-            <button className="btn-secondary" onClick={handleRunFederatedRound} style={{ width: '100%', marginTop: '12px' }}>
-              Aggregate next round
-            </button>
+            <div style={miniCard}>
+              <p style={{ fontSize: '11px', color: '#94a3b8', marginBottom: '4px' }}>Current route decision</p>
+              <p style={{ color: '#f8fafc', fontSize: '13px' }}>
+                {amsa
+                  ? `${amsa.feasibility.status} → ${amsa.amsa_decision.action} at decision SOC ${Number(amsa.decision_soc ?? socEstimate).toFixed(1)} %${riskAware ? ' (risk-aware)' : ''}`
+                  : 'Calculate a route in the User view to see the AMSA decision.'}
+              </p>
+              <p style={{ color: '#64748b', fontSize: '10px', marginTop: '6px' }}>
+                MC dropout (30 passes) + split-conformal calibration, CALCE LiFePO4, unseen drive cycles, 25 °C.
+              </p>
+            </div>
           </div>
         )}
 

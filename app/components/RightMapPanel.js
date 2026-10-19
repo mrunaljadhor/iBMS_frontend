@@ -94,7 +94,11 @@ export default function RightMapPanel({
   setRouteDistance,
   socSlider,
   datasetProfile,
-  onRouteInfoUpdate
+  onRouteInfoUpdate,
+  riskAware = false,
+  socMargin = 0,
+  onAmsaUpdate,
+  onRiskAwareChange
 }) {
 
   const mapRef = useRef(null);
@@ -116,8 +120,9 @@ export default function RightMapPanel({
   const [routeCandidates, setRouteCandidates] = useState([]);
   const [selectedRouteId, setSelectedRouteId] = useState('');
   const [showMathModal, setShowMathModal] = useState(false);
-  const [elevationData, setElevationData] = useState({ uphillClimb: 0, downhillDescent: 0 });
-  const [isFetchingElevation, setIsFetchingElevation] = useState(false);
+  const [hasRoute, setHasRoute] = useState(false);
+  const [amsa, setAmsa] = useState(null);
+  const [amsaStatus, setAmsaStatus] = useState('idle'); // idle | loading | ok | error
   const [routeInfo, setRouteInfo] = useState({
     distance: Number(routeDistance) || 0,
     duration: 0,
@@ -315,42 +320,6 @@ export default function RightMapPanel({
       throw new Error(`Place not found: ${placeName}. Try a fuller address or landmark.`);
     }
   };
-
-  /*
-  ========================================================================
-  LIVE API: OPENTOPODATA (ELEVATION) EXTRACTION
-  ========================================================================
-  */
-  const fetchRouteElevation = async (originCoords, destCoords) => {
-    if (!originCoords || !destCoords) return;
-    
-    setIsFetchingElevation(true);
-    try {
-      const response = await fetch(`/api/elevation?locations=${originCoords.lat},${originCoords.lng}|${destCoords.lat},${destCoords.lng}`);
-      const data = await response.json();
-      
-      if (data.status === 'OK' && data.results && data.results.length === 2) {
-        const elevation1 = data.results[0].elevation || 0;
-        const elevation2 = data.results[1].elevation || 0;
-        const elevationDiff = elevation2 - elevation1;
-        
-        const uphillClimb = elevationDiff > 0 ? elevationDiff : 0;
-        const downhillDescent = elevationDiff < 0 ? Math.abs(elevationDiff) : 0;
-        
-        setElevationData({
-          uphillClimb: Number(uphillClimb.toFixed(1)),
-          downhillDescent: Number(downhillDescent.toFixed(1))
-        });
-      }
-    } catch (error) {
-      console.error("Failed to fetch OpenTopoData elevation:", error);
-    } finally {
-      setIsFetchingElevation(false);
-    }
-  };
-  /*
-  ========================================================================
-  */
 
   const buildTrafficAwareRoute = async (originCoords, destCoords) => {
     if (!window.google?.maps) {
@@ -812,8 +781,8 @@ export default function RightMapPanel({
       setOrigin(originCoords);
       setDestination(destCoords);
 
-      // Concurrently fetch live Topographical data while routing
-      fetchRouteElevation(originCoords, destCoords);
+      // Route-aware AMSA (backend: TomTom route + traffic, SRTM 30 m elevation) runs in the effect below
+      setHasRoute(true);
 
       try {
         const optimizedTrafficRoute = await buildOptimizedTrafficRoute(originCoords, destCoords);
@@ -934,7 +903,12 @@ export default function RightMapPanel({
     setRouteDistance(socAdjustedOutputs.socAdjustedDistance);
   }, [routeInfo.effectiveDistance, routeInfo.durationInTraffic, socSlider, setRouteDistance]);
 
-  const dte = calculateDTE();
+  useEffect(() => {
+    if (routeInfo.distance && onRouteInfoUpdate) {
+      onRouteInfoUpdate(routeInfo);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [routeInfo]);
 
   const getNumeric = (...values) => {
     for (const value of values) {
@@ -1017,30 +991,65 @@ export default function RightMapPanel({
     }
   });
 
-  const soh = healthMetrics.soh;
+  const sohForAmsa = Number(healthMetrics.soh.toFixed(1));
 
-  const getSOHColor = (health) => {
-    if (health >= 95) return '#10b981';
-    if (health >= 85) return '#3b82f6';
-    if (health >= 80) return '#f59e0b';
-    return '#ef4444';
-  };
+  // Route-aware AMSA: the backend fetches its own TomTom route with live traffic and SRTM 30 m elevations,
+  // computes the ECO/SPORT DTE (paper Eqs. 3-8) and runs the leg-wise decision (Algorithm 1).
+  // In risk-aware mode it decides on SOC minus the calibrated uncertainty margin.
+  useEffect(() => {
+    if (!hasRoute || !Number.isFinite(origin?.lat) || !Number.isFinite(destination?.lat)) {
+      return undefined;
+    }
 
-  const socAdjustedDistance = routeInfo.socAdjustedDistance || routeInfo.effectiveDistance || routeDistance;
-  const socAdjustedDuration = routeInfo.socAdjustedDuration || routeInfo.durationInTraffic || routeInfo.duration;
+    let cancelled = false;
+    setAmsaStatus('loading');
+    const timer = setTimeout(async () => {
+      try {
+        const response = await fetch('/api/feasibility', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            current_soc: Number(socSlider),
+            origin: `${origin.lat},${origin.lng}`,
+            destination: `${destination.lat},${destination.lng}`,
+            baseSoh: sohForAmsa,
+            avgSpeedKmh: 60,
+            soc_uncertainty_pct: riskAware ? Number(socMargin) || 0 : 0
+          })
+        });
+        const data = await response.json();
+        if (!response.ok || data.error) {
+          throw new Error(data.error || `HTTP ${response.status}`);
+        }
+        if (data.physics_metrics) {
+          data.physics_metrics = Object.fromEntries(
+            Object.entries(data.physics_metrics).map(([key, value]) => [key, Number(value) || 0])
+          );
+        }
+        if (!cancelled) {
+          setAmsa(data);
+          setAmsaStatus('ok');
+          onAmsaUpdate?.(data);
+        }
+      } catch (amsaError) {
+        console.error('AMSA feasibility request failed:', amsaError);
+        if (!cancelled) {
+          setAmsa(null);
+          setAmsaStatus('error');
+          onAmsaUpdate?.(null);
+        }
+      }
+    }, 700);
 
-  const feasibilityDistance = socAdjustedDistance;
-  const dteStatus = feasibilityDistance && dte > (feasibilityDistance * 1.1)
-    ? 'safe'
-    : feasibilityDistance && dte >= (feasibilityDistance * 0.8)
-      ? 'critical'
-      : 'impossible';
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasRoute, origin?.lat, origin?.lng, destination?.lat, destination?.lng, socSlider, sohForAmsa, riskAware, socMargin]);
 
-  const getStatusColor = (status) => {
-    if (status === 'safe') return '#10b981';
-    if (status === 'critical') return '#f59e0b';
-    return '#ef4444';
-  };
+  const physics = amsa?.physics_metrics;
+  const amsaFromBackend = amsa && amsa.source !== 'local-fallback';
 
   const trafficColor = trafficSeverityColor(routeInfo.severity);
   const hasLiveTrafficData = Boolean(
@@ -1247,6 +1256,30 @@ export default function RightMapPanel({
           </div>
         )}
 
+        <label style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '10px',
+          marginTop: '12px',
+          padding: '10px 12px',
+          borderRadius: '8px',
+          border: `1px solid ${riskAware ? 'rgba(245, 158, 11, 0.6)' : 'rgba(71, 85, 105, 0.5)'}`,
+          background: riskAware ? 'rgba(245, 158, 11, 0.1)' : 'rgba(15, 23, 42, 0.4)',
+          cursor: 'pointer',
+          fontSize: '12px',
+          color: '#cbd5e1'
+        }}>
+          <input
+            type="checkbox"
+            checked={riskAware}
+            onChange={(event) => onRiskAwareChange?.(event.target.checked)}
+            style={{ accentColor: '#f59e0b' }}
+          />
+          <span>
+            Risk-aware AMSA: decide on SOC − {Number(socMargin).toFixed(1)} points (calibrated lower bound)
+          </span>
+        </label>
+
         <p style={{ fontSize: '11px', color: '#6b7280', marginTop: '12px' }}>
           {hasLiveTrafficData
             ? 'Route-level live traffic is active: red (heavy), yellow (moderate), green (smooth)'
@@ -1368,7 +1401,7 @@ export default function RightMapPanel({
         </div>
       </div>
 
-      {routeInfo && (
+      {hasRoute && (
         <div style={{
           background: 'linear-gradient(160deg, rgba(8, 10, 14, 0.96) 0%, rgba(2, 3, 6, 0.96) 100%)',
           border: '1px solid rgba(59, 130, 246, 0.3)',
@@ -1379,130 +1412,140 @@ export default function RightMapPanel({
         }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
             <h3 style={{ fontSize: '18px', fontWeight: 'bold', color: '#60a5fa', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span>⚡</span> Zero-Cost Physics Telemetry
+              <span>⚡</span> Route Physics (AMSA)
             </h3>
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
               <button
                 onClick={() => setShowMathModal(true)}
-                style={{ fontSize: '11px', color: '#fff', backgroundColor: 'rgba(59, 130, 246, 0.6)', border: '1px solid #60a5fa', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
+                disabled={!physics}
+                style={{ fontSize: '11px', color: '#fff', backgroundColor: 'rgba(59, 130, 246, 0.6)', border: '1px solid #60a5fa', padding: '4px 8px', borderRadius: '4px', cursor: physics ? 'pointer' : 'not-allowed', fontWeight: 'bold', opacity: physics ? 1 : 0.5 }}
               >
                 View Engine Math
               </button>
-              <span style={{ fontSize: '11px', color: '#93c5fd', backgroundColor: 'rgba(59, 130, 246, 0.2)', padding: '4px 8px', borderRadius: '4px' }}>OpenTopoData COP30 + TomTom</span>
+              <span style={{ fontSize: '11px', color: '#93c5fd', backgroundColor: 'rgba(59, 130, 246, 0.2)', padding: '4px 8px', borderRadius: '4px' }}>
+                {amsaFromBackend ? 'SRTM 30 m + TomTom' : amsa ? 'Offline estimate' : amsaStatus === 'loading' ? 'Computing…' : 'Backend unavailable'}
+              </span>
             </div>
           </div>
 
+          {amsaStatus === 'error' && (
+            <p style={{ fontSize: '12px', color: '#fca5a5', marginBottom: '12px' }}>
+              The AMSA backend could not be reached, so route physics are not available. Check BACKEND_API_URL and that the backend is awake.
+            </p>
+          )}
+          {amsa && !amsaFromBackend && (
+            <p style={{ fontSize: '12px', color: '#fcd34d', marginBottom: '12px' }}>
+              Offline estimate: straight-line distance on a flat road without traffic (backend not reachable).
+            </p>
+          )}
+
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-            <div style={{ backgroundColor: 'rgba(15, 23, 42, 0.6)', padding: '16px', borderRadius: '8px', border: '1px solid rgba(51, 65, 85, 0.5)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#9ca3af', fontSize: '13px', marginBottom: '4px' }}>
-                <span>Uphill Climb</span>
-                <span>⛰️</span>
+            {[
+              {
+                label: 'Uphill Climb', icon: '⛰️', color: '#f87171',
+                value: physics ? `+${physics.uphill_climb_meters.toFixed(0)} m` : '–',
+                note: physics ? `Cumulative grade g_u: ${physics.uphill_grade_pct.toFixed(2)} %` : 'Sum of rises along the route'
+              },
+              {
+                label: 'Downhill Descent', icon: '📉', color: '#4ade80',
+                value: physics ? `−${physics.downhill_descent_meters.toFixed(0)} m` : '–',
+                note: physics ? `Cumulative grade g_d: ${physics.downhill_grade_pct.toFixed(2)} %` : 'Sum of falls along the route'
+              },
+              {
+                label: 'Traffic Jam Ratio J', icon: '🚦', color: '#fb923c',
+                value: physics ? physics.traffic_jam_ratio.toFixed(3) : '–',
+                note: physics ? `Stop-and-go penalty: +${physics.torque_penalty_pct.toFixed(2)} %` : 'Share of the route in jams'
+              },
+              {
+                label: 'Regenerative Recovery', icon: '🔋', color: '#34d399',
+                value: physics ? `${physics.downhill_bonus_pct.toFixed(2)} %` : '–',
+                note: physics ? `Recovery efficiency η_r: ${physics.regen_efficiency.toFixed(2)}` : 'Energy returned on descents'
+              }
+            ].map((tile) => (
+              <div key={tile.label} style={{ backgroundColor: 'rgba(15, 23, 42, 0.6)', padding: '16px', borderRadius: '8px', border: '1px solid rgba(51, 65, 85, 0.5)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#9ca3af', fontSize: '13px', marginBottom: '4px' }}>
+                  <span>{tile.label}</span>
+                  <span>{tile.icon}</span>
+                </div>
+                <div style={{ fontSize: '24px', fontWeight: 'bold', color: tile.color }}>
+                  {amsaStatus === 'loading' && !physics ? '…' : tile.value}
+                </div>
+                <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>{tile.note}</div>
               </div>
-              <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#f87171' }}>
-                +{isFetchingElevation ? '...' : elevationData.uphillClimb} <span style={{ fontSize: '14px', color: '#6b7280', fontWeight: 'normal' }}>m</span>
-              </div>
-              <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
-                Grade: +{isFetchingElevation ? '...' : (((elevationData.uphillClimb) / ((routeInfo.distance || routeDistance || 1) * 1000)) * 100).toFixed(2)}%
-              </div>
-            </div>
-
-            <div style={{ backgroundColor: 'rgba(15, 23, 42, 0.6)', padding: '16px', borderRadius: '8px', border: '1px solid rgba(51, 65, 85, 0.5)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#9ca3af', fontSize: '13px', marginBottom: '4px' }}>
-                <span>Downhill Descent</span>
-                <span>📉</span>
-              </div>
-              <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#4ade80' }}>
-                -{isFetchingElevation ? '...' : elevationData.downhillDescent} <span style={{ fontSize: '14px', color: '#6b7280', fontWeight: 'normal' }}>m</span>
-              </div>
-              <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
-                Grade: -{isFetchingElevation ? '...' : (((elevationData.downhillDescent) / ((routeInfo.distance || routeDistance || 1) * 1000)) * 100).toFixed(2)}%
-              </div>
-            </div>
-
-            <div style={{ backgroundColor: 'rgba(15, 23, 42, 0.6)', padding: '16px', borderRadius: '8px', border: '1px solid rgba(51, 65, 85, 0.5)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#9ca3af', fontSize: '13px', marginBottom: '4px' }}>
-                <span>Traffic Torque Penalty</span>
-                <span>🚦</span>
-              </div>
-              <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#fb923c' }}>
-                +{(((routeInfo.delayMinutes || 0) / (routeInfo.staticDuration || 1)) * 0.3 * 100).toFixed(2)}%
-              </div>
-              <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
-                Stop-&-Go Density: {((routeInfo.delayMinutes || 0) / (routeInfo.staticDuration || 1)).toFixed(3)}
-              </div>
-            </div>
-
-            <div style={{ backgroundColor: 'rgba(15, 23, 42, 0.6)', padding: '16px', borderRadius: '8px', border: '1px solid rgba(51, 65, 85, 0.5)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#9ca3af', fontSize: '13px', marginBottom: '4px' }}>
-                <span>Regenerative Bonus</span>
-                <span>🔋</span>
-              </div>
-              <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#34d399' }}>
-                +{(((((routeInfo.distance || routeDistance || 0) * 3.8) / ((routeInfo.distance || routeDistance || 1) * 1000)) * 100) * 0.08 * (0.6 + ((routeInfo.delayMinutes || 0) / (routeInfo.staticDuration || 1)) * 0.2) * 100).toFixed(2)}%
-              </div>
-              <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
-                Efficiency: {(0.6 + ((routeInfo.delayMinutes || 0) / (routeInfo.staticDuration || 1)) * 0.2).toFixed(2)}
-              </div>
-            </div>
+            ))}
           </div>
         </div>
       )}
 
-      {showMathModal && routeInfo && (
+      {showMathModal && physics && (
         <div style={{
           position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center',
           backgroundColor: 'rgba(2, 6, 23, 0.85)', backdropFilter: 'blur(8px)', padding: '24px'
         }} onClick={() => setShowMathModal(false)}>
           <div style={{
             background: 'linear-gradient(160deg, rgba(15, 23, 42, 0.96) 0%, rgba(2, 6, 23, 0.96) 100%)',
-            border: '1px solid rgba(59, 130, 246, 0.4)', borderRadius: '16px', padding: '32px', width: '100%', maxWidth: '700px',
+            border: '1px solid rgba(59, 130, 246, 0.4)', borderRadius: '16px', padding: '32px', width: '100%', maxWidth: '720px',
             boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.7)', color: '#f8fafc',
             maxHeight: '90vh', overflowY: 'auto'
           }} onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', borderBottom: '1px solid rgba(51, 65, 85, 0.6)', paddingBottom: '16px' }}>
-              <h2 style={{ fontSize: '24px', fontWeight: 'bold', color: '#60a5fa' }}>Zero-Cost Physics Engine Math</h2>
+              <h2 style={{ fontSize: '24px', fontWeight: 'bold', color: '#60a5fa' }}>Route-Energy Model (this route)</h2>
               <button onClick={() => setShowMathModal(false)} style={{ background: 'none', border: 'none', color: '#94a3b8', fontSize: '24px', cursor: 'pointer' }}>&times;</button>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-              {/* Uphill Formula */}
-              <div>
-                <h4 style={{ color: '#f87171', fontSize: '16px', fontWeight: 'bold', marginBottom: '8px' }}>⛰️ Uphill Climb Force</h4>
-                <div style={{ backgroundColor: 'rgba(15, 23, 42, 0.6)', padding: '16px', borderRadius: '8px', border: '1px solid rgba(51, 65, 85, 0.5)', fontFamily: 'monospace', fontSize: '13px', color: '#cbd5e1' }}>
-                  <div style={{ color: '#9ca3af', marginBottom: '8px' }}>{"// Using OpenTopoData COP30 30m resolution"}</div>
-                  <div>const distMeters = {((routeInfo.distance || routeDistance || 1) * 1000).toFixed(0)};</div>
-                  <div>const uphillMeters = {((routeInfo.distance || routeDistance || 0) * 4.2).toFixed(1)};</div>
-                  <div style={{ marginTop: '8px', color: '#60a5fa' }}>const uphillGrade = (uphillMeters / distMeters) * 100;</div>
-                  <div style={{ color: '#f87171', fontWeight: 'bold' }}>{"// Grade = +"}{((((routeInfo.distance || routeDistance || 0) * 4.2) / ((routeInfo.distance || routeDistance || 1) * 1000)) * 100).toFixed(2)}%</div>
+            {(() => {
+              const L = Number(amsa.route_distance_km);
+              const gu = physics.uphill_grade_pct;
+              const gd = physics.downhill_grade_pct;
+              const J = physics.traffic_jam_ratio;
+              const eta = physics.regen_efficiency;
+              const blocks = [
+                {
+                  title: '⛰️ Cumulative grades (SRTM 30 m, ≤ 100 samples)', color: '#f87171',
+                  lines: [
+                    `L = ${L.toFixed(2)} km`,
+                    `g_u = 100 · Σ max(0, Δh) / L = 100 × ${physics.uphill_climb_meters.toFixed(0)} m / ${(L * 1000).toFixed(0)} m = ${gu.toFixed(2)} %`,
+                    `g_d = 100 · Σ max(0, −Δh) / L = ${gd.toFixed(2)} %`,
+                    `f_up = 1 + 0.15 · g_u = ${(1 + 0.15 * gu).toFixed(3)}`
+                  ]
+                },
+                {
+                  title: '🚦 Traffic (TomTom jam sections)', color: '#fb923c',
+                  lines: [
+                    `J = min(1, L_jam / L) = ${J.toFixed(3)}`,
+                    `v_eff = 60 · (1 − 0.5 J) = ${(60 * (1 - 0.5 * J)).toFixed(1)} km/h`,
+                    `f_sg = 1 + J · 0.3 = ${(1 + J * 0.3).toFixed(3)}`
+                  ]
+                },
+                {
+                  title: '🔋 Regeneration', color: '#34d399',
+                  lines: [
+                    `η_r = 0.6 + 0.2 J = ${eta.toFixed(2)}`,
+                    `f_dn = max(0.2, 1 − 0.08 · g_d · η_r) = ${Math.max(0.2, 1 - 0.08 * gd * eta).toFixed(3)}`
+                  ]
+                },
+                {
+                  title: '📏 Distance-to-empty and decision', color: '#60a5fa',
+                  lines: [
+                    `c_m = c₀ · F(v_eff)/F(60) · f_sg · f_acc · f_up · f_dn · f_T   (c₀ = 25.8 ECO / 31.6 SPORT Wh/km)`,
+                    `DTE_ECO = ${amsa.feasibility.eco_dte.toFixed(1)} km,  DTE_SPORT = ${amsa.feasibility.sport_dte.toFixed(1)} km  at SOC ${amsa.decision_soc ?? amsa.current_soc} %`,
+                    `Decision: ${amsa.feasibility.status} → ${amsa.amsa_decision.action}`
+                  ]
+                }
+              ];
+              return (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                  {blocks.map((block) => (
+                    <div key={block.title}>
+                      <h4 style={{ color: block.color, fontSize: '16px', fontWeight: 'bold', marginBottom: '8px' }}>{block.title}</h4>
+                      <div style={{ backgroundColor: 'rgba(15, 23, 42, 0.6)', padding: '16px', borderRadius: '8px', border: '1px solid rgba(51, 65, 85, 0.5)', fontFamily: 'monospace', fontSize: '13px', color: '#cbd5e1', display: 'grid', gap: '6px' }}>
+                        {block.lines.map((line) => <div key={line}>{line}</div>)}
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              </div>
-
-              {/* Traffic Formula */}
-              <div>
-                <h4 style={{ color: '#fb923c', fontSize: '16px', fontWeight: 'bold', marginBottom: '8px' }}>🚦 Traffic Torque Penalty</h4>
-                <div style={{ backgroundColor: 'rgba(15, 23, 42, 0.6)', padding: '16px', borderRadius: '8px', border: '1px solid rgba(51, 65, 85, 0.5)', fontFamily: 'monospace', fontSize: '13px', color: '#cbd5e1' }}>
-                  <div style={{ color: '#9ca3af', marginBottom: '8px' }}>{"// Evaluating Stop-&-Go density via TomTom Routing API"}</div>
-                  <div>const staticDuration = {routeInfo.staticDuration || 1};</div>
-                  <div>const delayMinutes = {routeInfo.delayMinutes || 0};</div>
-                  <div>const trafficRatio = delayMinutes / staticDuration; <span style={{ color: '#9ca3af' }}>{"// "}{((routeInfo.delayMinutes || 0) / (routeInfo.staticDuration || 1)).toFixed(3)}</span></div>
-                  <div style={{ marginTop: '8px', color: '#60a5fa' }}>const penalty = trafficRatio * 0.3 * 100;</div>
-                  <div style={{ color: '#fb923c', fontWeight: 'bold' }}>{"// Penalty = +"}{(((routeInfo.delayMinutes || 0) / (routeInfo.staticDuration || 1)) * 0.3 * 100).toFixed(2)}% energy cost</div>
-                </div>
-              </div>
-
-              {/* Regen Formula */}
-              <div>
-                <h4 style={{ color: '#34d399', fontSize: '16px', fontWeight: 'bold', marginBottom: '8px' }}>🔋 Regenerative Braking Bonus</h4>
-                <div style={{ backgroundColor: 'rgba(15, 23, 42, 0.6)', padding: '16px', borderRadius: '8px', border: '1px solid rgba(51, 65, 85, 0.5)', fontFamily: 'monospace', fontSize: '13px', color: '#cbd5e1' }}>
-                  <div style={{ color: '#9ca3af', marginBottom: '8px' }}>{"// Fusing descent grade with traffic braking frequency"}</div>
-                  <div>const downhillGrade = {((((routeInfo.distance || routeDistance || 0) * 3.8) / ((routeInfo.distance || routeDistance || 1) * 1000)) * 100).toFixed(2)};</div>
-                  <div>const baseRegen = 0.08;</div>
-                  <div>const trafficRegenEfficiency = 0.6 + (trafficRatio * 0.2); <span style={{ color: '#9ca3af' }}>{"// "}{(0.6 + ((routeInfo.delayMinutes || 0) / (routeInfo.staticDuration || 1)) * 0.2).toFixed(2)}</span></div>
-                  <div style={{ marginTop: '8px', color: '#60a5fa' }}>const regenBonus = downhillGrade * baseRegen * trafficRegenEfficiency * 100;</div>
-                  <div style={{ color: '#34d399', fontWeight: 'bold' }}>{"// Regen Bonus = +"}{(((((routeInfo.distance || routeDistance || 0) * 3.8) / ((routeInfo.distance || routeDistance || 1) * 1000)) * 100) * 0.08 * (0.6 + ((routeInfo.delayMinutes || 0) / (routeInfo.staticDuration || 1)) * 0.2) * 100).toFixed(2)}% recovered</div>
-                </div>
-              </div>
-            </div>
+              );
+            })()}
           </div>
         </div>
       )}
