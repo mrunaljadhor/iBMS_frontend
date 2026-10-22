@@ -441,6 +441,9 @@ export default function ProfessionalDashboard() {
           estimateRangeAtSoc={estimateRangeAtSoc}
           batteryData={batteryData}
           datasetProfile={activeDatasetProfile}
+          amsa={amsa}
+          riskAware={riskAware}
+          socMargin={socMargin}
         />
 
 

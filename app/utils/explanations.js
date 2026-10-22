@@ -161,6 +161,52 @@ export function explainRoutePhysics({ amsa, soh = 100, avgSpeedKmh = 60 }) {
   };
 }
 
+/**
+ * Route energy model behind the "Range vs SOC" and "Route Energy Breakdown" graphs.
+ * Uses the same factor chain as backend/server.js calculateDTE(). The usable pack energy is taken back from the
+ * backend reply (ECO range × ECO consumption ÷ SOC used), so the graphs match the AMSA decision exactly.
+ */
+export function routeEnergyModel({ amsa, soc, fallbackSoh = 100, avgSpeedKmh = 60 }) {
+  const p = amsa?.physics_metrics || {};
+  const L = Number(amsa?.route_distance_km) || 0;
+  const J = Number(p.traffic_jam_ratio) || 0;
+  const gu = Number(p.uphill_grade_pct) || 0;
+  const gd = Number(p.downhill_grade_pct) || 0;
+  const eta = 0.6 + 0.2 * J;
+  const speedFactor = roadLoad(avgSpeedKmh * (1 - 0.5 * J)).total / roadLoad(ROAD_LOAD.refKmh).total;
+  const fsg = 1 + J * 0.3;
+  const fup = 1 + 0.15 * gu;
+  const fdn = Math.max(0.2, 1 - 0.08 * gd * eta);
+  const cEco = BASE_CONSUMPTION.ECO * speedFactor * fsg * fup * fdn;
+  const cSport = BASE_CONSUMPTION.SPORT * speedFactor * fsg * fup * fdn;
+
+  const replySoc = Number(amsa?.decision_soc);
+  const replyEco = Number(amsa?.feasibility?.eco_dte);
+  const fromReply = replySoc > 0 && replyEco > 0;
+  const packWh = fromReply ? replyEco * cEco * 100 / replySoc : PACK.capacityAh * PACK.voltageV * (fallbackSoh / 100);
+  const soh = 100 * packWh / (PACK.capacityAh * PACK.voltageV);
+
+  const ecoFull = packWh / cEco;
+  const sportFull = packWh / cSport;
+  const naiveFull = packWh / BASE_CONSUMPTION.ECO;
+  const socNow = clamp(Number(soc) || 0, 0, 100);
+
+  const flatWh = BASE_CONSUMPTION.ECO * L;
+  const climbWh = flatWh * fup;
+  const regenWh = climbWh * fdn;
+  const totalWh = cEco * L;
+
+  return {
+    L, J, gu, gd, eta, speedFactor, fsg, fup, fdn, cEco, cSport, packWh, soh, fromReply,
+    ecoFull, sportFull, naiveFull, socNow,
+    thrEco: 100 * L / ecoFull,
+    thrSport: 100 * L / sportFull,
+    thrNaive: 100 * L / naiveFull,
+    availableWh: packWh * socNow / 100,
+    energy: { flatWh, climbWh: climbWh - flatWh, regenWh: regenWh - climbWh, trafficWh: totalWh - regenWh, totalWh }
+  };
+}
+
 // ------------------------------------------------------------------ Driving profile levels
 export function explainDrivingLevels({ soc, mode, level, routeDistance }) {
   const full = FULL_RANGE_KM[mode] || FULL_RANGE_KM.ECO;

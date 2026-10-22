@@ -207,3 +207,121 @@ export function graphTwinRul() {
     ]
   };
 }
+
+// ------------------------------------------------------------------ Route graphs (need a planned route)
+const ROUTE_SOURCE = 'app/utils/explanations.js → routeEnergyModel() (same factor chain as backend/server.js calculateDTE())';
+
+export function graphRangeVsSoc({ model, decisionSoc, status }) {
+  const m = model;
+  const at = (full) => full * decisionSoc / 100;
+  return {
+    title: 'Graph: Range vs SOC for the Planned Route',
+    intro: 'How far the battery can go on this route for every starting SOC, in ECO and SPORT mode, compared with the flat-road estimate a normal range display would show. '
+      + 'The coloured background shows what AMSA decides at each SOC. This is the live version of Fig. 3 in the paper.',
+    sections: [
+      { heading: 'Green and orange lines (ECO and SPORT range on this route)', value: `${n(m.ecoFull, 1)} / ${n(m.sportFull, 1)} km at 100 %`,
+        meaning: 'Range with the climb, descent, traffic and speed of this route included. Range is proportional to SOC, so each line is straight.',
+        formula: ['Range(SOC) = SOC/100 × usable pack energy ÷ route consumption of the mode',
+          'Usable pack energy = 30.9 Ah × 63.5 V × SOH/100'],
+        steps: [`Usable pack energy = 1,962 × ${n(m.soh, 1)}/100 = ${n(m.packWh, 0)} Wh`,
+          `ECO:   ${n(m.packWh, 0)} ÷ ${n(m.cEco, 2)} Wh/km = ${n(m.ecoFull, 1)} km at 100 % SOC`,
+          `SPORT: ${n(m.packWh, 0)} ÷ ${n(m.cSport, 2)} Wh/km = ${n(m.sportFull, 1)} km at 100 % SOC`],
+        source: ROUTE_SOURCE },
+      { heading: 'Grey dashed line (flat-road estimate)', value: `${n(m.naiveFull, 1)} km at 100 %`,
+        meaning: 'What a simple range display shows: the flat-road ECO consumption of 25.8 Wh/km, without hills or traffic. Where it lies above the green line, the display promises more range than the route allows.',
+        formula: ['Flat-road range(SOC) = SOC/100 × usable pack energy ÷ 25.8 Wh/km'],
+        steps: [`= ${n(m.packWh, 0)} ÷ 25.8 = ${n(m.naiveFull, 1)} km at 100 % SOC`,
+          `On this route the flat-road display ${m.naiveFull >= m.ecoFull ? 'overstates' : 'understates'} the ECO range by ${n(Math.abs(100 * (m.naiveFull / m.ecoFull - 1)), 1)} %`] },
+      { heading: 'Red dash-dot line (route distance)', value: `${n(m.L, 1)} km`,
+        meaning: 'Length of the route returned by TomTom. A mode can make the trip where its line is above this line.' },
+      { heading: 'Coloured bands (AMSA decision)',
+        meaning: 'Red: even ECO cannot reach, a charging stop is required. Amber: only ECO reaches, so SPORT is locked (ECO-Lock). Green: SPORT also reaches, the rider is free to choose.',
+        formula: ['Minimum SOC for a mode = 100 × route distance ÷ range of that mode at 100 % SOC'],
+        steps: [`ECO:   100 × ${n(m.L, 1)} ÷ ${n(m.ecoFull, 1)} = ${n(m.thrEco, 1)} %   (red below this)`,
+          `SPORT: 100 × ${n(m.L, 1)} ÷ ${n(m.sportFull, 1)} = ${n(m.thrSport, 1)} %   (green above this)`,
+          `Flat-road display would say OK from ${n(m.thrNaive, 1)} %`],
+        source: 'backend/server.js → checkFeasibility()' },
+      { heading: 'White vertical line (SOC used now)', value: `${n(decisionSoc, 1)} %`,
+        meaning: 'The SOC the decision is made at: the slider SOC, minus the safety margin when risk-aware AMSA is on.',
+        steps: [`ECO ${n(at(m.ecoFull), 1)} km, SPORT ${n(at(m.sportFull), 1)} km, route ${n(m.L, 1)} km → ${status}`] }
+    ]
+  };
+}
+
+export function graphEnergyBreakdown({ model }) {
+  const m = model;
+  const e = m.energy;
+  const sign = (v) => (v >= 0 ? `+${n(v, 0)}` : `−${n(Math.abs(v), 0)}`);
+  return {
+    title: 'Graph: Route Energy Breakdown (ECO mode)',
+    intro: 'Energy the trip needs, built up step by step: start from the flat-road energy, add the climb, take away what regeneration recovers on the descents, '
+      + 'then apply traffic and speed. The last bar is the energy available in the battery now, so you can see whether the trip fits.',
+    sections: [
+      { heading: 'Flat road', value: `${n(e.flatWh, 0)} Wh`,
+        meaning: 'Energy for the same distance on a flat road at 60 km/h without traffic.',
+        formula: ['Flat-road energy = 25.8 Wh/km × route distance'],
+        steps: [`= 25.8 × ${n(m.L, 2)} = ${n(e.flatWh, 0)} Wh`], source: ROUTE_SOURCE },
+      { heading: '+ Climb', value: `${sign(e.climbWh)} Wh`,
+        meaning: 'Extra energy to lift the vehicle up the hills.',
+        formula: ['Climb factor = 1 + 0.15 × uphill grade (%)', 'Climb energy = flat-road energy × (climb factor − 1)'],
+        steps: [`Climb factor = 1 + 0.15 × ${n(m.gu, 2)} = ${n(m.fup, 3)}`, `= ${n(e.flatWh, 0)} × ${n(m.fup - 1, 3)} = ${sign(e.climbWh)} Wh`] },
+      { heading: '− Regeneration', value: `${sign(e.regenWh)} Wh`,
+        meaning: 'Energy the motor recovers when braking on descents.',
+        formula: ['Downhill factor = max(0.2, 1 − 0.08 × downhill grade × recovery efficiency)', 'Regeneration = energy so far × (downhill factor − 1)'],
+        steps: [`Downhill factor = 1 − 0.08 × ${n(m.gd, 2)} × ${n(m.eta, 2)} = ${n(m.fdn, 3)}`,
+          `= ${n(e.flatWh + e.climbWh, 0)} × ${n(m.fdn - 1, 3)} = ${sign(e.regenWh)} Wh`] },
+      { heading: '± Traffic and speed', value: `${sign(e.trafficWh)} Wh`,
+        meaning: 'Traffic does two things: stop-and-go costs energy, but the lower average speed reduces air drag. In this model the second effect is larger, so moderate traffic can lower the energy (the traffic finding in the paper).',
+        formula: ['Traffic factor = speed factor × stop-and-go factor = F(60 × (1 − 0.5 J)) ÷ F(60) × (1 + 0.3 J)'],
+        steps: [`J = ${n(m.J, 3)}: ${n(m.speedFactor, 3)} × ${n(m.fsg, 3)} = ${n(m.speedFactor * m.fsg, 3)}`,
+          `= ${n(e.flatWh + e.climbWh + e.regenWh, 0)} × ${n(m.speedFactor * m.fsg - 1, 3)} = ${sign(e.trafficWh)} Wh`] },
+      { heading: 'Total needed', value: `${n(e.totalWh, 0)} Wh`,
+        formula: ['Total = ECO route consumption × distance'],
+        steps: [`= ${n(m.cEco, 2)} Wh/km × ${n(m.L, 2)} km = ${n(e.totalWh, 0)} Wh   (${sign(100 * (e.totalWh / e.flatWh - 1))} % vs flat road)`] },
+      { heading: 'Available in battery', value: `${n(m.availableWh, 0)} Wh`,
+        meaning: 'Green if it covers the total (ECO can make the trip), red if not.',
+        formula: ['Available = SOC used/100 × usable pack energy'],
+        steps: [`= ${n(m.socNow, 1)}/100 × ${n(m.packWh, 0)} = ${n(m.availableWh, 0)} Wh`] }
+    ]
+  };
+}
+
+// TABLE II of the paper (experiments/exp1_soc_lstm and experiments/exp2_calce_lfp)
+export const SOC_ACCURACY_RESULTS = [
+  { name: 'LSTM (no SOC₀)', dataset: 'CALCE', mae: 3.17 },
+  { name: 'EKF-1RC, SOC₀ −10 %', dataset: 'CALCE', mae: 0.96 },
+  { name: 'Coulomb, SOC₀ −10 %', dataset: 'CALCE', mae: 10.11 },
+  { name: 'Constant (mean)', dataset: 'CALCE', mae: 24.65 },
+  { name: 'LSTM, fine-tuned', dataset: 'Field', mae: 1.24 },
+  { name: 'LSTM, zero-shot', dataset: 'Field', mae: 7.37 },
+  { name: 'Coulomb, true SOC₀', dataset: 'Field', mae: 0.07 },
+  { name: 'Coulomb, SOC₀ +2 %', dataset: 'Field', mae: 2.06 },
+  { name: 'EKF', dataset: 'Field', mae: 2.42 },
+  { name: 'Constant (mean)', dataset: 'Field', mae: 1.22 },
+  { name: 'LSTM', dataset: 'Synthetic', mae: 0.20 }
+];
+
+export function graphSocAccuracy() {
+  const rows = (ds) => SOC_ACCURACY_RESULTS.filter((r) => r.dataset === ds).map((r) => `${r.name}: ${n(r.mae, 2)} %`);
+  return {
+    title: 'Graph: SOC Estimation Accuracy',
+    intro: 'Mean absolute error (MAE) of each SOC estimator, from TABLE II of the paper. Shorter bars are better. These are fixed results of offline experiments, not live values.',
+    sections: [
+      { heading: 'What MAE means',
+        formula: ['MAE (% SOC) = average of |estimated SOC − true SOC| over all test samples'],
+        meaning: 'An MAE of 3 % means the estimate is, on average, 3 SOC points away from the truth.' },
+      { heading: 'Blue bars: CALCE public LiFePO4 data (the fair comparison)',
+        meaning: 'Full discharges of A123 cells; the model is tested on a drive cycle it never saw, at 25 °C. The EKF is the most accurate but needs a measured OCV curve and a fitted cell model. '
+          + 'The LSTM needs no starting SOC, OCV curve or capacity. Coulomb counting carries a wrong starting SOC to the end.',
+        steps: rows('CALCE'), source: 'experiments/exp2_calce_lfp/' },
+      { heading: 'Orange bars: our field sessions (stand tests)',
+        meaning: 'Each session covers only a narrow SOC range, so even a constant guess scores about as well as the fine-tuned LSTM. '
+          + 'These numbers show that fine-tuning removes the synthetic-to-real offset, but they cannot rank the estimators.',
+        steps: rows('Field'), source: 'experiments/exp1_soc_lstm/run_exp1.py (leave-one-session-out)' },
+      { heading: 'Purple bar: synthetic test data',
+        meaning: 'Held-out synthetic scenarios. An upper bound, because the generator ties voltage to SOC almost exactly.',
+        steps: rows('Synthetic') },
+      { heading: 'Where in the code', source: 'app/utils/graphExplanations.js → SOC_ACCURACY_RESULTS (copied from the paper, TABLE II)' }
+    ]
+  };
+}
