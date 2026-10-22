@@ -241,7 +241,7 @@ export default function LeftPanel({ userRole, batteryData, drivingMode, setDrivi
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
 
       {/* Status and SOC side by side when there is room, stacked otherwise */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '24px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '16px' }}>
         {/* BATTERY STATUS */}
         <div style={{
           background: 'linear-gradient(160deg, rgba(8, 10, 14, 0.96) 0%, rgba(2, 3, 6, 0.96) 100%)',
@@ -252,8 +252,8 @@ export default function LeftPanel({ userRole, batteryData, drivingMode, setDrivi
           backdropFilter: 'blur(16px)',
           transition: 'all 0.3s ease'
         }} className="slide-up">
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '28px' }}>
-            <h3 style={{ fontSize: '20px', fontWeight: 'bold', color: 'white' }}>Battery Status</h3>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px', marginBottom: '28px' }}>
+            <h3 style={{ fontSize: '20px', fontWeight: 'bold', color: 'white', whiteSpace: 'nowrap' }}>Battery Status</h3>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <ExplainButton {...explainBatteryStatus({ soc: socSlider, mode: drivingMode, params: batteryParams })} />
               <span style={{ fontSize: '11px', color: '#38bdf8', letterSpacing: '0.1em', textTransform: 'uppercase', border: '1px solid rgba(56, 189, 248, 0.5)', borderRadius: '9999px', padding: '4px 10px' }}>Battery</span>
@@ -408,7 +408,8 @@ export default function LeftPanel({ userRole, batteryData, drivingMode, setDrivi
                   key={value}
                   onClick={() => setSocSlider(value)}
                   style={{
-                    padding: '10px',
+                    padding: '10px 0',
+                    minWidth: 0,
                     borderRadius: '8px',
                     fontWeight: 'bold',
                     border: socSlider === value ? '2px solid #3b82f6' : '1px solid #475569',
@@ -439,7 +440,8 @@ export default function LeftPanel({ userRole, batteryData, drivingMode, setDrivi
                     key={level.id}
                     onClick={() => setOperatingProfile && setOperatingProfile(level.id)}
                     style={{
-                      padding: '12px 8px',
+                      padding: '12px 6px',
+                      minWidth: 0,
                       borderRadius: '8px',
                       display: 'flex',
                       flexDirection: 'column',

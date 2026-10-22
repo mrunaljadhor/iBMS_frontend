@@ -448,7 +448,7 @@ export default function ProfessionalDashboard() {
         {/* Main Dashboard - Split Screen */}
         <div style={{
           display: 'grid',
-          gridTemplateColumns: userRole !== 'analyst' ? 'minmax(0, 4fr) minmax(0, 6fr)' : 'minmax(0, 1fr) minmax(0, 1fr)',
+          gridTemplateColumns: userRole !== 'analyst' ? 'minmax(0, 46fr) minmax(0, 54fr)' : 'minmax(0, 1fr) minmax(0, 1fr)',
           gap: '22px',
           minHeight: 'calc(100vh - 240px)'
         }}>
