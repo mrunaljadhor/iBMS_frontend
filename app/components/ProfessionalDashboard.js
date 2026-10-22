@@ -448,12 +448,12 @@ export default function ProfessionalDashboard() {
         {/* Main Dashboard - Split Screen */}
         <div style={{
           display: 'grid',
-          gridTemplateColumns: userRole !== 'analyst' ? '3.5fr 6.5fr' : '1fr 1fr',
+          gridTemplateColumns: userRole !== 'analyst' ? 'minmax(0, 4fr) minmax(0, 6fr)' : 'minmax(0, 1fr) minmax(0, 1fr)',
           gap: '22px',
           minHeight: 'calc(100vh - 240px)'
         }}>
           {/* LEFT PANEL - 50% */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', overflowY: 'auto', paddingRight: '16px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', overflowY: 'auto', paddingRight: '16px', minWidth: 0 }}>
             <LeftPanel
               userRole={userRole}
               batteryData={batteryData}
@@ -474,7 +474,7 @@ export default function ProfessionalDashboard() {
           </div>
 
           {/* RIGHT PANEL - 50% */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', overflowY: 'auto', paddingRight: '16px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', overflowY: 'auto', paddingRight: '16px', minWidth: 0 }}>
             {userRole !== 'analyst' ? (
               <RightMapPanel
                 origin={origin}

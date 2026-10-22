@@ -240,8 +240,8 @@ export default function LeftPanel({ userRole, batteryData, drivingMode, setDrivi
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
 
-      {/* Side-by-Side Grid for Status and SOC */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
+      {/* Status and SOC side by side when there is room, stacked otherwise */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '24px' }}>
         {/* BATTERY STATUS */}
         <div style={{
           background: 'linear-gradient(160deg, rgba(8, 10, 14, 0.96) 0%, rgba(2, 3, 6, 0.96) 100%)',
