@@ -1413,7 +1413,7 @@ export default function RightMapPanel({
         }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
             <h3 style={{ fontSize: '18px', fontWeight: 'bold', color: '#60a5fa', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span>⚡</span> Route Physics (AMSA)
+              <span>⚡</span> Zero-Cost Physics Telemetry
             </h3>
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
               <button
@@ -1453,12 +1453,12 @@ export default function RightMapPanel({
                 note: physics ? `Cumulative grade g_d: ${physics.downhill_grade_pct.toFixed(2)} %` : 'Sum of falls along the route'
               },
               {
-                label: 'Traffic Jam Ratio J', icon: '🚦', color: '#fb923c',
-                value: physics ? physics.traffic_jam_ratio.toFixed(3) : '–',
-                note: physics ? `Stop-and-go penalty: +${physics.torque_penalty_pct.toFixed(2)} %` : 'Share of the route in jams'
+                label: 'Traffic Torque Penalty', icon: '🚦', color: '#fb923c',
+                value: physics ? `+${physics.torque_penalty_pct.toFixed(2)} %` : '–',
+                note: physics ? `Traffic-jam ratio J: ${physics.traffic_jam_ratio.toFixed(3)}` : 'Stop-and-go energy penalty'
               },
               {
-                label: 'Regenerative Recovery', icon: '🔋', color: '#34d399',
+                label: 'Regenerative Bonus', icon: '🔋', color: '#34d399',
                 value: physics ? `${physics.downhill_bonus_pct.toFixed(2)} %` : '–',
                 note: physics ? `Recovery efficiency η_r: ${physics.regen_efficiency.toFixed(2)}` : 'Energy returned on descents'
               }
@@ -1490,7 +1490,7 @@ export default function RightMapPanel({
             maxHeight: '90vh', overflowY: 'auto'
           }} onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', borderBottom: '1px solid rgba(51, 65, 85, 0.6)', paddingBottom: '16px' }}>
-              <h2 style={{ fontSize: '24px', fontWeight: 'bold', color: '#60a5fa' }}>Route-Energy Model (this route)</h2>
+              <h2 style={{ fontSize: '24px', fontWeight: 'bold', color: '#60a5fa' }}>Zero-Cost Physics Engine Math</h2>
               <button onClick={() => setShowMathModal(false)} style={{ background: 'none', border: 'none', color: '#94a3b8', fontSize: '24px', cursor: 'pointer' }}>&times;</button>
             </div>
 
