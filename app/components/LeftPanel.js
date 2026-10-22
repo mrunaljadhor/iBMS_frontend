@@ -4,13 +4,9 @@ import { useState } from 'react';
 import { PieChart, Pie, Cell, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { calculateBatteryHealthMetrics } from '../utils/batteryHealth';
 import { TRINITY_DATASET_PROFILE } from '../utils/trinityDatasetProfile';
+import ExplainButton from './ExplainButton';
+import { DRIVING_LEVELS, explainBatteryStatus, explainDrivingLevels, explainRouteInfo, explainRul, explainSoh } from '../utils/explanations';
 
-const DRIVING_LEVELS = [
-  { id: 'level_1', label: 'L1: Optimal', description: 'Normal Braking, Normal Accel' },
-  { id: 'level_2', label: 'L2: Moderate', description: 'Aggressive Braking, Normal Accel' },
-  { id: 'level_3', label: 'L3: High Drain', description: 'Normal Braking, Aggressive Accel' },
-  { id: 'level_4', label: 'L4: Extreme', description: 'Aggressive Braking, Aggressive Accel' }
-];
 
 export default function LeftPanel({ userRole, batteryData, drivingMode, setDrivingMode, socSlider, setSocSlider, calculateDTE, routeDistance, datasetProfile, routeInfo, operatingProfile, setOperatingProfile, amsa, riskAware = false, socMargin = 0 }) {
   const dte = calculateDTE();
@@ -141,11 +137,9 @@ export default function LeftPanel({ userRole, batteryData, drivingMode, setDrivi
 
   const activeDatasetProfile = datasetProfile || TRINITY_DATASET_PROFILE;
 
-  const healthMetrics = calculateBatteryHealthMetrics({
-    soc: getNumeric(socSlider, batteryData?.Actual_SOC, batteryData?.SOC, 0),
-    temperatureC: getNumeric(batteryData?.Max_Temp_C, batteryData?.temperature, batteryParams.temperature, 25),
-    voltageDiffV: getNumeric(batteryData?.Volt_Diff_V, batteryData?.voltage_diff, batteryData?.volt_diff, batteryParams.voltDiff, 0.05),
-    datasetProfile: {
+  const healthTemperatureC = getNumeric(batteryData?.Max_Temp_C, batteryData?.temperature, batteryParams.temperature, 25);
+  const healthVoltDiffV = getNumeric(batteryData?.Volt_Diff_V, batteryData?.voltage_diff, batteryData?.volt_diff, batteryParams.voltDiff, 0.05);
+  const healthProfile = {
       ...TRINITY_DATASET_PROFILE,
       ...activeDatasetProfile,
       datasetName: activeDatasetProfile.datasetName || batteryData?.Dataset_Name || TRINITY_DATASET_PROFILE.datasetName,
@@ -195,7 +189,12 @@ export default function LeftPanel({ userRole, batteryData, drivingMode, setDrivi
         activeDatasetProfile.nominalVoltDiffV,
         TRINITY_DATASET_PROFILE.nominalVoltDiffV
       )
-    }
+  };
+  const healthMetrics = calculateBatteryHealthMetrics({
+    soc: getNumeric(socSlider, batteryData?.Actual_SOC, batteryData?.SOC, 0),
+    temperatureC: healthTemperatureC,
+    voltageDiffV: healthVoltDiffV,
+    datasetProfile: healthProfile
   });
 
   const soh = healthMetrics.soh;
@@ -255,7 +254,10 @@ export default function LeftPanel({ userRole, batteryData, drivingMode, setDrivi
         }} className="slide-up">
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '28px' }}>
             <h3 style={{ fontSize: '20px', fontWeight: 'bold', color: 'white' }}>Battery Status</h3>
-            <span style={{ fontSize: '11px', color: '#38bdf8', letterSpacing: '0.1em', textTransform: 'uppercase', border: '1px solid rgba(56, 189, 248, 0.5)', borderRadius: '9999px', padding: '4px 10px' }}>Battery</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <ExplainButton {...explainBatteryStatus({ soc: socSlider, mode: drivingMode, params: batteryParams })} />
+              <span style={{ fontSize: '11px', color: '#38bdf8', letterSpacing: '0.1em', textTransform: 'uppercase', border: '1px solid rgba(56, 189, 248, 0.5)', borderRadius: '9999px', padding: '4px 10px' }}>Battery</span>
+            </div>
           </div>
 
           {/* Voltage */}
@@ -424,7 +426,13 @@ export default function LeftPanel({ userRole, batteryData, drivingMode, setDrivi
 
             {/* Driving Profile Levels */}
             <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <label style={{ fontSize: '13px', fontWeight: '600', color: '#d1d5db' }}>Driving Profile Level:</label>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap' }}>
+                <label style={{ fontSize: '13px', fontWeight: '600', color: '#d1d5db' }}>Driving Profile Level:</label>
+                <ExplainButton
+                  label="View Math"
+                  {...explainDrivingLevels({ soc: socSlider, mode: drivingMode, level: operatingProfile, routeDistance })}
+                />
+              </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
                 {DRIVING_LEVELS.map(level => (
                   <button
@@ -641,7 +649,10 @@ export default function LeftPanel({ userRole, batteryData, drivingMode, setDrivi
           }} className="slide-up">
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
               <h3 style={{ fontSize: '20px', fontWeight: 'bold', color: 'white' }}>State of Health (SOH)</h3>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <ExplainButton {...explainSoh({ health: healthMetrics, profile: { ...TRINITY_DATASET_PROFILE, ...healthProfile }, temperatureC: healthTemperatureC, voltageDiffV: healthVoltDiffV })} />
               <span style={{ fontSize: '11px', color: '#38bdf8', letterSpacing: '0.1em', textTransform: 'uppercase', border: '1px solid rgba(56, 189, 248, 0.45)', borderRadius: '9999px', padding: '4px 10px' }}>Health</span>
+            </div>
             </div>
 
             <div style={{ display: 'flex', gap: '20px', alignItems: 'center', marginBottom: '24px' }}>
@@ -719,7 +730,10 @@ export default function LeftPanel({ userRole, batteryData, drivingMode, setDrivi
           }} className="slide-up">
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
               <h3 style={{ fontSize: '20px', fontWeight: 'bold', color: 'white' }}>Remaining Useful Life</h3>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <ExplainButton {...explainRul({ health: healthMetrics, profile: { ...TRINITY_DATASET_PROFILE, ...healthProfile }, eol: activeEol, rul: dynamicRul, best: bestCaseRul, worst: worstCaseRul })} />
               <span style={{ fontSize: '11px', color: '#38bdf8', letterSpacing: '0.1em', textTransform: 'uppercase', border: '1px solid rgba(56, 189, 248, 0.45)', borderRadius: '9999px', padding: '4px 10px' }}>RUL</span>
+            </div>
             </div>
 
             <p style={{
@@ -833,9 +847,12 @@ export default function LeftPanel({ userRole, batteryData, drivingMode, setDrivi
           }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
               <h3 style={{ fontSize: '18px', fontWeight: 'bold', color: '#f8fafc' }}>Route Information</h3>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <ExplainButton {...explainRouteInfo({ routeInfo, soc: socSlider, dte, socAdjustedDistance, amsa, dteStatus })} />
               <span style={{ fontSize: '11px', color: trafficColor, letterSpacing: '0.1em', textTransform: 'uppercase', border: `1px solid ${trafficColor}99`, borderRadius: '9999px', padding: '4px 10px' }}>
                 {trafficSeverityLabel(routeInfo.severity)} Traffic
               </span>
+            </div>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px', backgroundColor: 'rgba(51, 65, 85, 0.4)', borderRadius: '8px' }}>

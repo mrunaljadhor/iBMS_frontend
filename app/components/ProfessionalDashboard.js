@@ -7,6 +7,7 @@ import AdvancedIntelligenceSuite from './AdvancedIntelligenceSuite';
 import RightMapPanel from './RightMapPanel';
 import { TRINITY_DATASET_PROFILE } from '../utils/trinityDatasetProfile';
 import { deriveDatasetProfileFromCsv } from '../utils/datasetProfile';
+import { DRIVING_LEVELS as LEVEL_FACTORS, FULL_RANGE_KM } from '../utils/explanations';
 
 const VEHICLE_OPTIONS = [
   {
@@ -54,18 +55,6 @@ const VEHICLE_OPTIONS = [
     }
   }
 ];
-
-const DRIVING_LEVELS = [
-  { id: 'level_1', label: 'Level 1: Optimal', description: 'Normal Braking, Normal Acceleration', factor: 1.0 },
-  { id: 'level_2', label: 'Level 2: Moderate', description: 'Aggressive Braking, Normal Acceleration', factor: 1.1 },
-  { id: 'level_3', label: 'Level 3: High Drain', description: 'Normal Braking, Aggressive Acceleration', factor: 1.25 },
-  { id: 'level_4', label: 'Level 4: Extreme', description: 'Aggressive Braking, Aggressive Acceleration', factor: 1.4 }
-];
-
-const TRINITY_FULL_RANGE_KM = {
-  ECO: 76,
-  SPORT: 62
-};
 
 const DEFAULT_VEHICLE_ID = 'trinity_ev';
 
@@ -206,8 +195,8 @@ export default function ProfessionalDashboard() {
   const estimateRangeAtSoc = (socPercent, mode = drivingMode, profile = operatingProfile) => {
     const safeSoc = Math.max(0, Math.min(100, Number(socPercent) || 0));
     const normalizedMode = String(mode || 'ECO').toUpperCase();
-    const baseFullRange = TRINITY_FULL_RANGE_KM[normalizedMode] || TRINITY_FULL_RANGE_KM.ECO;
-    const profileFactor = DRIVING_LEVELS.find(l => l.id === profile)?.factor || 1.0;
+    const baseFullRange = FULL_RANGE_KM[normalizedMode] || FULL_RANGE_KM.ECO;
+    const profileFactor = LEVEL_FACTORS.find(l => l.id === profile)?.factor || 1.0;
     return Math.round((safeSoc / 100) * (baseFullRange / profileFactor));
   };
 

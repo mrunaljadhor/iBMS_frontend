@@ -10,6 +10,8 @@ import {
 } from '@react-google-maps/api';
 import { calculateBatteryHealthMetrics } from '../utils/batteryHealth';
 import { TRINITY_DATASET_PROFILE } from '../utils/trinityDatasetProfile';
+import ExplainButton from './ExplainButton';
+import { explainRoutePhysics } from '../utils/explanations';
 
 const DEFAULT_MAP_CENTER = { lat: 28.6139, lng: 77.2090 };
 const ROUTE_COLOR_PALETTE = ['#3b82f6', '#8b5cf6', '#06b6d4', '#f97316', '#22c55e', '#ec4899'];
@@ -119,7 +121,6 @@ export default function RightMapPanel({
   const [trafficSegments, setTrafficSegments] = useState([]);
   const [routeCandidates, setRouteCandidates] = useState([]);
   const [selectedRouteId, setSelectedRouteId] = useState('');
-  const [showMathModal, setShowMathModal] = useState(false);
   const [hasRoute, setHasRoute] = useState(false);
   const [amsa, setAmsa] = useState(null);
   const [amsaStatus, setAmsaStatus] = useState('idle'); // idle | loading | ok | error
@@ -1416,13 +1417,11 @@ export default function RightMapPanel({
               <span>⚡</span> Zero-Cost Physics Telemetry
             </h3>
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              <button
-                onClick={() => setShowMathModal(true)}
+              <ExplainButton
+                label="View Engine Math"
                 disabled={!physics}
-                style={{ fontSize: '11px', color: '#fff', backgroundColor: 'rgba(59, 130, 246, 0.6)', border: '1px solid #60a5fa', padding: '4px 8px', borderRadius: '4px', cursor: physics ? 'pointer' : 'not-allowed', fontWeight: 'bold', opacity: physics ? 1 : 0.5 }}
-              >
-                View Engine Math
-              </button>
+                {...explainRoutePhysics({ amsa, soh: sohForAmsa })}
+              />
               <span style={{ fontSize: '11px', color: '#93c5fd', backgroundColor: 'rgba(59, 130, 246, 0.2)', padding: '4px 8px', borderRadius: '4px' }}>
                 {amsaFromBackend ? 'SRTM 30 m + TomTom' : amsa ? 'Offline estimate' : amsaStatus === 'loading' ? 'Computing…' : 'Backend unavailable'}
               </span>
@@ -1478,78 +1477,6 @@ export default function RightMapPanel({
         </div>
       )}
 
-      {showMathModal && physics && (
-        <div style={{
-          position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center',
-          backgroundColor: 'rgba(2, 6, 23, 0.85)', backdropFilter: 'blur(8px)', padding: '24px'
-        }} onClick={() => setShowMathModal(false)}>
-          <div style={{
-            background: 'linear-gradient(160deg, rgba(15, 23, 42, 0.96) 0%, rgba(2, 6, 23, 0.96) 100%)',
-            border: '1px solid rgba(59, 130, 246, 0.4)', borderRadius: '16px', padding: '32px', width: '100%', maxWidth: '720px',
-            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.7)', color: '#f8fafc',
-            maxHeight: '90vh', overflowY: 'auto'
-          }} onClick={e => e.stopPropagation()}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', borderBottom: '1px solid rgba(51, 65, 85, 0.6)', paddingBottom: '16px' }}>
-              <h2 style={{ fontSize: '24px', fontWeight: 'bold', color: '#60a5fa' }}>Zero-Cost Physics Engine Math</h2>
-              <button onClick={() => setShowMathModal(false)} style={{ background: 'none', border: 'none', color: '#94a3b8', fontSize: '24px', cursor: 'pointer' }}>&times;</button>
-            </div>
-
-            {(() => {
-              const L = Number(amsa.route_distance_km);
-              const gu = physics.uphill_grade_pct;
-              const gd = physics.downhill_grade_pct;
-              const J = physics.traffic_jam_ratio;
-              const eta = physics.regen_efficiency;
-              const blocks = [
-                {
-                  title: '⛰️ Cumulative grades (SRTM 30 m, ≤ 100 samples)', color: '#f87171',
-                  lines: [
-                    `L = ${L.toFixed(2)} km`,
-                    `g_u = 100 · Σ max(0, Δh) / L = 100 × ${physics.uphill_climb_meters.toFixed(0)} m / ${(L * 1000).toFixed(0)} m = ${gu.toFixed(2)} %`,
-                    `g_d = 100 · Σ max(0, −Δh) / L = ${gd.toFixed(2)} %`,
-                    `f_up = 1 + 0.15 · g_u = ${(1 + 0.15 * gu).toFixed(3)}`
-                  ]
-                },
-                {
-                  title: '🚦 Traffic (TomTom jam sections)', color: '#fb923c',
-                  lines: [
-                    `J = min(1, L_jam / L) = ${J.toFixed(3)}`,
-                    `v_eff = 60 · (1 − 0.5 J) = ${(60 * (1 - 0.5 * J)).toFixed(1)} km/h`,
-                    `f_sg = 1 + J · 0.3 = ${(1 + J * 0.3).toFixed(3)}`
-                  ]
-                },
-                {
-                  title: '🔋 Regeneration', color: '#34d399',
-                  lines: [
-                    `η_r = 0.6 + 0.2 J = ${eta.toFixed(2)}`,
-                    `f_dn = max(0.2, 1 − 0.08 · g_d · η_r) = ${Math.max(0.2, 1 - 0.08 * gd * eta).toFixed(3)}`
-                  ]
-                },
-                {
-                  title: '📏 Distance-to-empty and decision', color: '#60a5fa',
-                  lines: [
-                    `c_m = c₀ · F(v_eff)/F(60) · f_sg · f_acc · f_up · f_dn · f_T   (c₀ = 25.8 ECO / 31.6 SPORT Wh/km)`,
-                    `DTE_ECO = ${amsa.feasibility.eco_dte.toFixed(1)} km,  DTE_SPORT = ${amsa.feasibility.sport_dte.toFixed(1)} km  at SOC ${amsa.decision_soc ?? amsa.current_soc} %`,
-                    `Decision: ${amsa.feasibility.status} → ${amsa.amsa_decision.action}`
-                  ]
-                }
-              ];
-              return (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                  {blocks.map((block) => (
-                    <div key={block.title}>
-                      <h4 style={{ color: block.color, fontSize: '16px', fontWeight: 'bold', marginBottom: '8px' }}>{block.title}</h4>
-                      <div style={{ backgroundColor: 'rgba(15, 23, 42, 0.6)', padding: '16px', borderRadius: '8px', border: '1px solid rgba(51, 65, 85, 0.5)', fontFamily: 'monospace', fontSize: '13px', color: '#cbd5e1', display: 'grid', gap: '6px' }}>
-                        {block.lines.map((line) => <div key={line}>{line}</div>)}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              );
-            })()}
-          </div>
-        </div>
-      )}
 
     </div>
   );

@@ -15,6 +15,8 @@ import {
 } from 'recharts';
 import { calculateBatteryHealthMetrics } from '../utils/batteryHealth';
 import { TRINITY_DATASET_PROFILE } from '../utils/trinityDatasetProfile';
+import ExplainButton from './ExplainButton';
+import { explainDigitalTwin, explainShap, explainSocUncertainty } from '../utils/explanations';
 
 const API_BASE = '';
 
@@ -309,6 +311,16 @@ export default function AdvancedIntelligenceSuite({
   const socEstimate = Number(socSlider) || 0;
   const socLowerBound = Math.max(0, socEstimate - (Number(socMargin) || 0));
 
+  const xaiInputs = {
+    voltage:     Number(batteryData?.Voltage_V  || batteryData?.Voltage  || 63.5),
+    current:     Number(batteryData?.Current_A  || batteryData?.Current  || 0),
+    temperature: liveTemperature,
+    voltageDiff: liveVoltDiff,
+    cycleCount:  Number(batteryData?.Cycle_Count || healthMetrics?.cycleCount || 0),
+    soc:         socSlider,
+    drivingMode: drivingMode || 'ECO',
+  };
+
   useEffect(() => {
     let cancelled = false;
 
@@ -316,15 +328,7 @@ export default function AdvancedIntelligenceSuite({
       const syncAnalytics = async () => {
         try {
           const [xaiResult] = await Promise.all([
-            postJson('/api/intelligence/xai', {
-              voltage:     Number(batteryData?.Voltage_V  || batteryData?.Voltage  || 63.5),
-              current:     Number(batteryData?.Current_A  || batteryData?.Current  || 0),
-              temperature: liveTemperature,
-              voltageDiff: liveVoltDiff,
-              cycleCount:  Number(batteryData?.Cycle_Count || healthMetrics?.cycleCount || 0),
-              soc:         socSlider,
-              drivingMode: drivingMode || 'ECO',
-            }).catch(e => { console.error('XAI API error:', e); return null; }),
+            postJson('/api/intelligence/xai', xaiInputs).catch(e => { console.error('XAI API error:', e); return null; }),
           ]);
 
           if (!cancelled) {
@@ -477,8 +481,14 @@ export default function AdvancedIntelligenceSuite({
 
         <div style={suiteCard}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
-            <h4 style={{ fontSize: '15px', color: '#e2e8f0', fontWeight: 700 }}>Stress Attribution</h4>
-            <span className="badge-warning">Heuristic</span>
+            <h4 style={{ fontSize: '15px', color: '#e2e8f0', fontWeight: 700 }}>SHAP Attributions</h4>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <ExplainButton
+                label="View Math"
+                {...explainShap({ inputs: xaiInputs, target: xaiTarget, attributions: xaiDisplay.attributions[xaiTarget], fromApi: Boolean(remoteAnalytics.xai) })}
+              />
+              <span className="badge-warning">SHAP-style</span>
+            </div>
           </div>
 
           {/* Target selector tabs */}
@@ -549,7 +559,7 @@ export default function AdvancedIntelligenceSuite({
             <p style={{ fontSize: '11px', color: '#94a3b8', marginBottom: '4px' }}>Live signal</p>
             <p style={{ color: '#f8fafc', fontSize: '12px' }}>{xaiDisplay.signal}</p>
             <p style={{ color: '#94a3b8', fontSize: '11px', marginTop: '8px' }}>
-              Bars are rule-based weightings of the stress terms. SHAP computed offline on the LSTM SOC model attributes 93–96 % to recent terminal voltage.
+              Bars are rule-based, SHAP-style shares of the stress terms (see View Math). SHAP computed offline on the LSTM SOC model attributes 93–96 % to recent terminal voltage.
             </p>
           </div>
         </div>
@@ -560,7 +570,10 @@ export default function AdvancedIntelligenceSuite({
           <div style={suiteCard}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
               <h4 style={{ fontSize: '15px', color: '#e2e8f0', fontWeight: 700 }}>SOC Uncertainty</h4>
-              <span className="badge-success">Calibrated</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <ExplainButton label="View Math" {...explainSocUncertainty({ soc: socEstimate, margin: Number(socMargin) || 0, riskAware, amsa })} />
+                <span className="badge-success">Calibrated</span>
+              </div>
             </div>
 
             <div style={{ ...miniCard, marginBottom: '12px' }}>
@@ -648,7 +661,17 @@ export default function AdvancedIntelligenceSuite({
           <div style={suiteCard}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
               <h4 style={{ fontSize: '15px', color: '#e2e8f0', fontWeight: 700 }}>Digital Twin Simulator</h4>
-              <span className="badge-danger">What-If</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <ExplainButton
+                  label="View Math"
+                  {...explainDigitalTwin({
+                    energyPenaltyPct, speedFactor, accelFactor, regenBonus, consumptionPenalty, payloadWeightKg, terrainGradientPct,
+                    ambientTempDeltaC, projectedDte, baseDte, feasibilityStatus, twinDistance, projectedRul, baseSoh: baseSoH,
+                    scenarioDailyDrop, eol: healthMetrics.eolThreshold, tornado: tornadoData
+                  })}
+                />
+                <span className="badge-danger">What-If</span>
+              </div>
             </div>
 
           <div style={{ display: 'grid', gap: '10px', marginBottom: '12px' }}>
