@@ -22,6 +22,10 @@ import {
 } from 'recharts';
 import { calculateBatteryHealthMetrics } from '../utils/batteryHealth';
 import { TRINITY_DATASET_PROFILE } from '../utils/trinityDatasetProfile';
+import ExplainButton from './ExplainButton';
+import {
+  graphDegradation, graphModeEfficiency, graphOperatingEnvelope, graphRouteUtilization, graphRulComparison, graphStressFactors
+} from '../utils/graphExplanations';
 
 const socColors = ['#22c55e', '#334155'];
 const utilizationColors = ['#38bdf8', '#374151'];
@@ -138,11 +142,7 @@ export default function OverviewAnalyticsPanel({
 
   const activeDatasetProfile = datasetProfile || TRINITY_DATASET_PROFILE;
 
-  const healthMetrics = calculateBatteryHealthMetrics({
-    soc: getNumeric(socSlider, batteryData?.Actual_SOC, batteryData?.SOC, 0),
-    temperatureC: liveTemperature,
-    voltageDiffV: liveVoltDiff,
-    datasetProfile: {
+  const healthProfile = {
       ...TRINITY_DATASET_PROFILE,
       ...activeDatasetProfile,
       datasetName: activeDatasetProfile.datasetName || batteryData?.Dataset_Name || TRINITY_DATASET_PROFILE.datasetName,
@@ -192,7 +192,12 @@ export default function OverviewAnalyticsPanel({
         activeDatasetProfile.nominalVoltDiffV,
         TRINITY_DATASET_PROFILE.nominalVoltDiffV
       )
-    }
+  };
+  const healthMetrics = calculateBatteryHealthMetrics({
+    soc: getNumeric(socSlider, batteryData?.Actual_SOC, batteryData?.SOC, 0),
+    temperatureC: liveTemperature,
+    voltageDiffV: liveVoltDiff,
+    datasetProfile: healthProfile
   });
 
   const socPieData = [
@@ -327,9 +332,12 @@ export default function OverviewAnalyticsPanel({
           gap: '18px'
         }}>
           <div style={chartCardStyle}>
-            <h4 style={{ fontSize: '14px', color: '#cbd5e1', marginBottom: '12px', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
-              Degradation Contribution
-            </h4>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', marginBottom: '12px' }}>
+              <h4 style={{ fontSize: '14px', color: '#cbd5e1', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+                Degradation Contribution
+              </h4>
+              <ExplainButton compact {...graphDegradation({ health: healthMetrics })} />
+            </div>
             <div style={{ width: '100%', height: '200px' }}>
               <ResponsiveContainer>
                 <PieChart>
@@ -356,9 +364,12 @@ export default function OverviewAnalyticsPanel({
           </div>
 
           <div style={chartCardStyle}>
-            <h4 style={{ fontSize: '14px', color: '#cbd5e1', marginBottom: '12px', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
-              Route Utilization
-            </h4>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', marginBottom: '12px' }}>
+              <h4 style={{ fontSize: '14px', color: '#cbd5e1', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+                Route Utilization
+              </h4>
+              <ExplainButton compact {...graphRouteUtilization({ routeDistance, dte })} />
+            </div>
             <div style={{ width: '100%', height: '200px' }}>
               <ResponsiveContainer>
                 <PieChart>
@@ -387,9 +398,12 @@ export default function OverviewAnalyticsPanel({
 
 
           <div style={chartCardStyle}>
-            <h4 style={{ fontSize: '14px', color: '#cbd5e1', marginBottom: '12px', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
-              Health Stress Factors
-            </h4>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', marginBottom: '12px' }}>
+              <h4 style={{ fontSize: '14px', color: '#cbd5e1', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+                Health Stress Factors
+              </h4>
+              <ExplainButton compact {...graphStressFactors({ health: healthMetrics, temperatureC: liveTemperature, voltageDiffV: liveVoltDiff, soc: socSlider, profile: { ...TRINITY_DATASET_PROFILE, ...healthProfile } })} />
+            </div>
             <div style={{ width: '100%', height: '200px' }}>
               <ResponsiveContainer>
                 <BarChart data={stressData} margin={{ top: 5, right: 0, left: -15, bottom: 0 }}>
@@ -407,9 +421,12 @@ export default function OverviewAnalyticsPanel({
           </div>
 
           <div style={chartCardStyle}>
-            <h4 style={{ fontSize: '14px', color: '#cbd5e1', marginBottom: '12px', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
-              Mode Efficiency Comparison
-            </h4>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', marginBottom: '12px' }}>
+              <h4 style={{ fontSize: '14px', color: '#cbd5e1', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+                Mode Efficiency Comparison
+              </h4>
+              <ExplainButton compact {...graphModeEfficiency({ soc: socSlider })} />
+            </div>
             <div style={{ width: '100%', height: '200px' }}>
               <ResponsiveContainer>
                 <BarChart data={efficiencyData} margin={{ top: 5, right: 0, left: -15, bottom: 0 }}>
@@ -426,9 +443,12 @@ export default function OverviewAnalyticsPanel({
           </div>
 
           <div style={chartCardStyle}>
-            <h4 style={{ fontSize: '14px', color: '#cbd5e1', marginBottom: '12px', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
-              Operating Envelope
-            </h4>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', marginBottom: '12px' }}>
+              <h4 style={{ fontSize: '14px', color: '#cbd5e1', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+                Operating Envelope
+              </h4>
+              <ExplainButton compact {...graphOperatingEnvelope({ temperatureC: liveTemperature, voltageDiffV: liveVoltDiff, mode: drivingMode, soc: socSlider })} />
+            </div>
             <div style={{ width: '100%', height: '200px' }}>
               <ResponsiveContainer>
                 <RadarChart cx="50%" cy="50%" outerRadius="70%" data={envelopeData}>
@@ -442,9 +462,12 @@ export default function OverviewAnalyticsPanel({
           </div>
 
           <div style={chartCardStyle}>
-            <h4 style={{ fontSize: '14px', color: '#cbd5e1', marginBottom: '12px', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
-              RUL Projection Comparison
-            </h4>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', marginBottom: '12px' }}>
+              <h4 style={{ fontSize: '14px', color: '#cbd5e1', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+                RUL Projection Comparison
+              </h4>
+              <ExplainButton compact {...graphRulComparison({ rul: healthMetrics.rulYears })} />
+            </div>
             <div style={{ width: '100%', height: '200px' }}>
               <ResponsiveContainer>
                 <BarChart data={rulComparisonData} margin={{ top: 5, right: 0, left: -15, bottom: 0 }}>

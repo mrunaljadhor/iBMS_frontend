@@ -5,6 +5,7 @@ import { PieChart, Pie, Cell, LineChart, Line, XAxis, YAxis, CartesianGrid, Tool
 import { calculateBatteryHealthMetrics } from '../utils/batteryHealth';
 import { TRINITY_DATASET_PROFILE } from '../utils/trinityDatasetProfile';
 import ExplainButton from './ExplainButton';
+import { graphRulTrajectory, graphSohDonut, graphSohGauge } from '../utils/graphExplanations';
 import { DRIVING_LEVELS, explainBatteryStatus, explainDrivingLevels, explainRouteInfo, explainRul, explainSoh } from '../utils/explanations';
 
 
@@ -660,6 +661,9 @@ export default function LeftPanel({ userRole, batteryData, drivingMode, setDrivi
             <div style={{ display: 'flex', gap: '20px', alignItems: 'center', marginBottom: '24px' }}>
               {/* Circular Glowing Gauge */}
               <div style={{ position: 'relative', width: '120px', height: '120px', flexShrink: 0 }}>
+                <div style={{ position: 'absolute', top: '-6px', right: '-10px', zIndex: 1 }}>
+                  <ExplainButton compact {...graphSohGauge({ soh, eol: healthMetrics.eolThreshold })} />
+                </div>
                 <svg width="120" height="120" viewBox="0 0 120 120">
                   <circle cx="60" cy="60" r="54" fill="none" stroke="rgba(55, 65, 81, 0.5)" strokeWidth="8" />
                   <circle
@@ -683,7 +687,10 @@ export default function LeftPanel({ userRole, batteryData, drivingMode, setDrivi
 
               {/* Degradation Breakdown Donut */}
               <div style={{ flexGrow: 1, height: '140px', position: 'relative' }}>
-                <p style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', position: 'absolute', top: '-10px', left: 0 }}>Capacity Fade: {(baseSoh - soh).toFixed(1)}%</p>
+                <div style={{ position: 'absolute', top: '-12px', left: 0, right: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'center', zIndex: 1 }}>
+                  <p style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Capacity Fade: {(baseSoh - soh).toFixed(1)}%</p>
+                  <ExplainButton compact {...graphSohDonut({ health: healthMetrics })} />
+                </div>
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
@@ -772,7 +779,10 @@ export default function LeftPanel({ userRole, batteryData, drivingMode, setDrivi
 
               {/* Projection Curve */}
               <div style={{ height: '160px', paddingRight: '10px' }}>
-                <p style={{ fontSize: '11px', color: '#94a3b8', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Degradation Trajectory</p>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <p style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Degradation Trajectory</p>
+                  <ExplainButton compact {...graphRulTrajectory({ soh, eol: activeEol, rate: healthMetrics.yearlyDegradation, rul: dynamicRul })} />
+                </div>
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={projectionData} margin={{ top: 5, right: 0, left: -20, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(148, 163, 184, 0.1)" />

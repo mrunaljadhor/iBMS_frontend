@@ -15,7 +15,7 @@ import { createPortal } from 'react-dom';
  *   source:   'backend/server.js → /api/feasibility'  // where it lives in the code
  * }]
  */
-export default function ExplainButton({ title, intro, sections = [], label = 'View Math', disabled = false }) {
+export default function ExplainButton({ title, intro, sections = [], label = 'View Math', disabled = false, compact = false }) {
   const [open, setOpen] = useState(false);
 
   // close with Escape
@@ -28,24 +28,39 @@ export default function ExplainButton({ title, intro, sections = [], label = 'Vi
 
   return (
     <>
+      {compact ? (
+        <button
+          onClick={() => setOpen(true)}
+          title="How is this graph calculated?"
+          aria-label="How is this graph calculated?"
+          style={{
+            width: '20px', height: '20px', borderRadius: '9999px', flexShrink: 0,
+            border: '1px solid #60a5fa', background: 'rgba(59, 130, 246, 0.25)', color: '#bfdbfe',
+            fontSize: '12px', fontWeight: 'bold', lineHeight: '18px', padding: 0, cursor: 'pointer'
+          }}
+        >
+          i
+        </button>
+      ) : (
       <button
-        onClick={() => setOpen(true)}
-        disabled={disabled}
-        style={{
-          fontSize: '11px',
-          color: '#fff',
-          backgroundColor: 'rgba(59, 130, 246, 0.55)',
-          border: '1px solid #60a5fa',
-          padding: '4px 9px',
-          borderRadius: '6px',
-          cursor: disabled ? 'not-allowed' : 'pointer',
-          fontWeight: 'bold',
-          opacity: disabled ? 0.5 : 1,
-          whiteSpace: 'nowrap'
-        }}
-      >
-        ⓘ {label}
-      </button>
+          onClick={() => setOpen(true)}
+          disabled={disabled}
+          style={{
+            fontSize: '11px',
+            color: '#fff',
+            backgroundColor: 'rgba(59, 130, 246, 0.55)',
+            border: '1px solid #60a5fa',
+            padding: '4px 9px',
+            borderRadius: '6px',
+            cursor: disabled ? 'not-allowed' : 'pointer',
+            fontWeight: 'bold',
+            opacity: disabled ? 0.5 : 1,
+            whiteSpace: 'nowrap'
+          }}
+        >
+          ⓘ {label}
+        </button>
+      )}
 
       {open && typeof document !== 'undefined' && createPortal((
         <div

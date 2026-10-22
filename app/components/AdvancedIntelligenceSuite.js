@@ -16,6 +16,7 @@ import {
 import { calculateBatteryHealthMetrics } from '../utils/batteryHealth';
 import { TRINITY_DATASET_PROFILE } from '../utils/trinityDatasetProfile';
 import ExplainButton from './ExplainButton';
+import { graphTwinRul, graphTwinSoh, graphTwinTornado } from '../utils/graphExplanations';
 import { explainDigitalTwin, explainShap, explainSocUncertainty } from '../utils/explanations';
 
 const API_BASE = '';
@@ -748,7 +749,10 @@ export default function AdvancedIntelligenceSuite({
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '12px' }}>
             <div style={{ width: '100%', height: '220px' }}>
-              <p style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px' }}>DTE Impact Tornado Chart</p>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                <p style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>DTE Impact Tornado Chart</p>
+                <ExplainButton compact {...graphTwinTornado({ tornado: tornadoData, baseDte })} />
+              </div>
               <ResponsiveContainer>
                 <BarChart data={tornadoData} layout="vertical" margin={{ top: 0, right: 30, left: 10, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(148, 163, 184, 0.18)" horizontal={true} vertical={false} />
@@ -765,7 +769,10 @@ export default function AdvancedIntelligenceSuite({
             </div>
             
             <div style={{ width: '100%', height: '220px' }}>
-              <p style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px' }}>SOH Projection Horizon</p>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                <p style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>SOH Projection Horizon</p>
+                <ExplainButton compact {...graphTwinSoh({ baseSoh: baseSoH, payloadWeightKg, ambientTempDeltaC })} />
+              </div>
               <ResponsiveContainer width="100%" height={160}>
               <LineChart data={twinCurve}>
                 <CartesianGrid stroke="rgba(148, 163, 184, 0.18)" strokeDasharray="3 3" />
@@ -781,7 +788,10 @@ export default function AdvancedIntelligenceSuite({
           </div>
 
           <div style={{ width: '100%', height: '220px' }}>
-              <p style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px' }}>RUL Projection Horizon</p>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                <p style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>RUL Projection Horizon</p>
+                <ExplainButton compact {...graphTwinRul()} />
+              </div>
               <ResponsiveContainer width="100%" height={160}>
               <LineChart data={twinCurve}>
                 <CartesianGrid stroke="rgba(148, 163, 184, 0.18)" strokeDasharray="3 3" />
